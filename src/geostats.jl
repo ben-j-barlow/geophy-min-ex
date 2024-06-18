@@ -28,7 +28,7 @@ end
 @with_kw struct GeoStatsDistribution <: GeoDist
     grid_dims::Tuple{Int64, Int64, Int64} = (50, 50, 1)
     data::RockObservations = RockObservations()
-    domain::CartesianGrid{2, Int64} = CartesianGrid{Int64}(grid_dims[1], grid_dims[2])
+    domain::CartesianGrid = CartesianGrid{Int64}(grid_dims[1], grid_dims[2])
     mean::Float64 = 0.3
     variogram::Variogram = SphericalVariogram(sill=0.005, range=30.0,
                                             nugget=0.0001)
@@ -79,8 +79,17 @@ function calc_covs(d::GeoStatsDistribution, problem)
     pdomain = domain(problem)
 
     var = :ore
+
+    # 1
+    k = keys(d.lu_params.lugs.vparams)
+
+    # 2 check structure
+    s = d.lu_params.lugs.vparams
+
+    
     varparams = d.lu_params.lugs.vparams[:ore]
     if hasdata(problem)
+
         vmapping = map(pdata, pdomain, (var,), varparams.mapping)[var]
     else
         vmapping = Dict()

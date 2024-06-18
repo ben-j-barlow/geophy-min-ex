@@ -43,5 +43,5 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 
 [compat]
 DataFrames = "≥ 1.2"
-GeoStats = "≥ 0.7.0"
+GeoStats = "0.35.1"
 ScientificTypes = "≥ 1.0"

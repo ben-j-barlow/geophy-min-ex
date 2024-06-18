@@ -59,7 +59,7 @@ function calc_K(geostats::GeoDist, rock_obs::RockObservations)
         pdomain = geostats.domain
         γ = geostats.variogram
     else
-        pdomain = CartesianGrid{Int64}(geostats.grid_dims[1], geostats.grid_dims[2])
+        pdomain = CartesianGrid(geostats.grid_dims[1], geostats.grid_dims[2])
         γ = SphericalVariogram(sill=geostats.sill, range=geostats.variogram[6], nugget=geostats.nugget)
     end
     # table = DataFrame(ore=rock_obs.ore_quals .- geostats.mean)

@@ -2,7 +2,8 @@ function GeoStatsDistribution(p::MineralExplorationPOMDP; truth=false)
     grid_dims = truth ? p.high_fidelity_dim : p.grid_dim
     variogram = SphericalVariogram(sill=p.variogram[1], range=p.variogram[2],
                                     nugget=p.variogram[3])
-    domain = CartesianGrid{Int64}(grid_dims[1], grid_dims[2])
+    #domain = CartesianGrid(convert(Float64, grid_dims[1]), convert(Float64, grid_dims[2]))
+    domain = CartesianGrid(grid_dims[1], grid_dims[2])
     #return GeoStatsDistribution(rng=p.rng,
     return GeoStatsDistribution(grid_dims=grid_dims,
                                 data=deepcopy(p.initial_data),
