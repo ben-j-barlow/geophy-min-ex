@@ -56,7 +56,7 @@ abstract type MainbodyGen end
     # nugget::Tuple = (1, 0)
     geodist_type::Type = GeoStatsDistribution # GeoDist type for geo noise
     gp_mean::Float64 = 0.25
-    mainbody_weight::Float64 = 0.6
+    mainbody_weight::Float64 = 0.6  
     true_mainbody_gen::MainbodyGen = BlobNode(grid_dims=high_fidelity_dim) # high-fidelity true mainbody generator
     mainbody_gen::MainbodyGen = BlobNode(grid_dims=grid_dim)
     massive_threshold::Float64 = 0.7
@@ -65,11 +65,13 @@ abstract type MainbodyGen end
     c_exp::Float64 = 1.0
 end
 
-struct MEInitStateDist
-    true_gp_distribution::GeoDist
-    gp_distribution::GeoDist
+struct MEInitStateDist  # prior over state space
+    true_gp_distribution::GeoDist  #
+    gp_distribution::GeoDist  # background noise on tope of mainbody, no conditioning on samples
+    # mainbody - some shape of what the main ore body looks like
     mainbody_weight::Float64
-    true_mainbody_gen::MainbodyGen
+    true_mainbody_gen::MainbodyGen  # the way to sample a shape, e.g., with circle sample a radius or centre
+    # only need one of true_mainbody_gen and mainbody_gen as don't need to generate different shapes
     mainbody_gen::MainbodyGen
     massive_thresh::Float64
     dim_scale::Float64

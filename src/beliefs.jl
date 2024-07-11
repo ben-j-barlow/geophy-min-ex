@@ -9,7 +9,7 @@ struct MEBeliefUpdater{G} <: POMDPs.Updater
     rng::AbstractRNG
 end
 
-function MEBeliefUpdater(m::MineralExplorationPOMDP, n::Int64, noise::Float64=1.0; abc::Bool=false, abc_ϵ::Float64=1e-1, abc_dist::Function=(x,x′)->abs(x-x′))
+function MEBeliefUpdater(m::MineralExplorationPOMDP, n::Int64, noise::Float64=1.0; abc::Bool=false, abc_ϵ::Float64=1e-1, abc_dist::Function=(x, x′) -> abs(x - x′))
     geostats = m.geodist_type(m)
     return MEBeliefUpdater(m, geostats, n, noise, abc, abc_ϵ, abc_dist, m.rng)
 end
@@ -101,8 +101,8 @@ function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, roc
 end
 
 function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
-                geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation;
-                apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
+    geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation;
+    apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
     sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true)
     mainbody_params = []
     particles = MEState[]
@@ -135,7 +135,7 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
         ore_map = gp_ore_map .+ mainbody_map
         rock_obs_p = RockObservations(rock_obs.ore_quals, rock_obs.coordinates)
         sp = MEState(ore_map, mainbody_param, mainbody_map, rock_obs_p,
-                    o.stopped, o.decided)
+            o.stopped, o.decided)
         push!(mainbody_params, mainbody_param)
         push!(particles, sp)
     end
@@ -143,7 +143,7 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
 end
 
 function update_particles(up::MEBeliefUpdater, particles::Vector{MEState},
-                          geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
+    geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
     wp = reweight(up, geostats, particles, rock_obs)
     pp = resample(up, particles, wp, geostats, rock_obs, a, o)
     return pp
@@ -151,7 +151,7 @@ end
 
 
 function update_particles_perturbed_inject(up::MEBeliefUpdater, particles::Vector{MEState},
-                                           geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
+    geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
     m = 50 # TODO: parameterize `m`
     wp = reweight(up, geostats, particles, rock_obs)
     injected_particles = resample(up, particles, wp, geostats, rock_obs, a, o; apply_perturbation=true, n=m)
@@ -186,7 +186,7 @@ function reweight_abc(up::MEBeliefUpdater, particles::Vector, rock_obs::RockObse
 end
 
 function update_particles_abc(up::MEBeliefUpdater, particles::Vector{MEState},
-                              geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
+    geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
     wp = reweight_abc(up, particles, rock_obs)
     pp = resample(up, particles, wp, geostats, rock_obs, a, o; apply_perturbation=false, resample_background_noise=false)
     return pp
@@ -198,7 +198,7 @@ function inject_particles(up::MEBeliefUpdater, n::Int64)
 end
 
 function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
-                       a::MEAction, o::MEObservation)
+    a::MEAction, o::MEObservation)
     if a.type != :drill
         bp_particles = MEState[] # MEState[p for p in b.particles]
         for p in b.particles
@@ -206,20 +206,20 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
             push!(bp_particles, s)
         end
         bp_rock = RockObservations(ore_quals=deepcopy(b.rock_obs.ore_quals),
-                                coordinates=deepcopy(b.rock_obs.coordinates))
+            coordinates=deepcopy(b.rock_obs.coordinates))
         # TODO Make this a little more general in future
         if up.m.geodist_type == GeoStatsDistribution
             bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, bp_rock,
-                                            b.geostats.domain, b.geostats.mean,
-                                            b.geostats.variogram, b.geostats.lu_params)
+                b.geostats.domain, b.geostats.mean,
+                b.geostats.variogram, b.geostats.lu_params)
         elseif up.m.geodist_type == GSLIBDistribution
             bp_geostats = GSLIBDistribution(b.geostats.grid_dims, b.geostats.grid_dims,
-                                            bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
-                                            b.geostats.variogram, b.geostats.target_histogram_file,
-                                            b.geostats.columns_for_vr_and_wt, b.geostats.zmin_zmax,
-                                            b.geostats.lower_tail_option, b.geostats.upper_tail_option,
-                                            b.geostats.transform_data, b.geostats.mn,
-                                            b.geostats.sz)
+                bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
+                b.geostats.variogram, b.geostats.target_histogram_file,
+                b.geostats.columns_for_vr_and_wt, b.geostats.zmin_zmax,
+                b.geostats.lower_tail_option, b.geostats.upper_tail_option,
+                b.geostats.transform_data, b.geostats.mn,
+                b.geostats.sz)
         end
     else
         bp_rock = deepcopy(b.rock_obs)
@@ -227,17 +227,17 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
         push!(bp_rock.ore_quals, o.ore_quality)
         if up.m.geodist_type == GeoStatsDistribution
             bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock),
-                                            b.geostats.domain, b.geostats.mean,
-                                            b.geostats.variogram, b.geostats.lu_params)
+                b.geostats.domain, b.geostats.mean,
+                b.geostats.variogram, b.geostats.lu_params)
             update!(bp_geostats, bp_rock)
         elseif up.m.geodist_type == GSLIBDistribution
             bp_geostats = GSLIBDistribution(b.geostats.grid_dims, b.geostats.grid_dims,
-                                            bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
-                                            b.geostats.variogram, b.geostats.target_histogram_file,
-                                            b.geostats.columns_for_vr_and_wt, b.geostats.zmin_zmax,
-                                            b.geostats.lower_tail_option, b.geostats.upper_tail_option,
-                                            b.geostats.transform_data, b.geostats.mn,
-                                            b.geostats.sz)
+                bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
+                b.geostats.variogram, b.geostats.target_histogram_file,
+                b.geostats.columns_for_vr_and_wt, b.geostats.zmin_zmax,
+                b.geostats.lower_tail_option, b.geostats.upper_tail_option,
+                b.geostats.transform_data, b.geostats.mn,
+                b.geostats.sz)
         end
         f_update_particles = up.abc ? update_particles_abc : update_particles
         bp_particles = f_update_particles(up, b.particles, bp_geostats, bp_rock, a, o)
@@ -259,7 +259,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     bp_decided = o.decided
 
     return MEBelief(bp_particles, bp_rock, bp_acts, bp_obs, bp_stopped,
-                    bp_decided, bp_geostats, up)
+        bp_decided, bp_geostats, up)
 end
 
 function Base.rand(rng::AbstractRNG, b::MEBelief)
@@ -271,7 +271,7 @@ Base.rand(b::MEBelief) = rand(Random.GLOBAL_RNG, b)
 function summarize(b::MEBelief)
     (x, y, z) = size(b.particles[1].ore_map)
     μ = zeros(Float64, x, y, z)
-    w = 1.0/length(b.particles)
+    w = 1.0 / length(b.particles)
     for p in b.particles
         ore_map = p.ore_map
         μ .+= ore_map .* w
@@ -279,7 +279,7 @@ function summarize(b::MEBelief)
     σ² = zeros(Float64, x, y, z)
     for p in b.particles
         ore_map = p.ore_map
-        σ² .+= w*(ore_map - μ).^2
+        σ² .+= w * (ore_map - μ) .^ 2
     end
     return (μ, σ²)
 end
@@ -294,10 +294,10 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
             n_obs = length(b.rock_obs.ore_quals) - n_initial
             if m.max_movement != 0 && n_obs > 0
                 d = m.max_movement
-                drill_s = b.rock_obs.coordinates[:,end]
+                drill_s = b.rock_obs.coordinates[:, end]
                 x = drill_s[1]
                 y = drill_s[2]
-                reachable_coords = CartesianIndices((x-d:x+d,y-d:y+d))
+                reachable_coords = CartesianIndices((x-d:x+d, y-d:y+d))
                 reachable_acts = MEAction[]
                 for coord in reachable_coords
                     dx = abs(x - coord[1])
@@ -312,11 +312,11 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
                 # reachable_acts = OrderedSet([MEAction(coords=coord) for coord in collect(reachable_coords)])
                 action_set = intersect(reachable_acts, action_set)
             end
-            for i=1:n_obs
-                coord = b.rock_obs.coordinates[:, i + n_initial]
+            for i = 1:n_obs
+                coord = b.rock_obs.coordinates[:, i+n_initial]
                 x = Int64(coord[1])
                 y = Int64(coord[2])
-                keepout = collect(CartesianIndices((x-m.delta:x+m.delta,y-m.delta:y+m.delta)))
+                keepout = collect(CartesianIndices((x-m.delta:x+m.delta, y-m.delta:y+m.delta)))
                 keepout_acts = OrderedSet([MEAction(coords=coord) for coord in keepout])
                 setdiff!(action_set, keepout_acts)
             end
@@ -345,10 +345,10 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
             n_obs = length(s.rock_obs.ore_quals) - n_initial
             if m.max_movement != 0 && n_obs > 0
                 d = m.max_movement
-                drill_s = s.rock_obs.coordinates[:,end]
+                drill_s = s.rock_obs.coordinates[:, end]
                 x = drill_s[1]
                 y = drill_s[2]
-                reachable_coords = CartesianIndices((x-d:x+d,y-d:y+d))
+                reachable_coords = CartesianIndices((x-d:x+d, y-d:y+d))
                 reachable_acts = MEAction[]
                 for coord in reachable_coords
                     dx = abs(x - coord[1])
@@ -363,11 +363,11 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
                 # reachable_acts = OrderedSet([MEAction(coords=coord) for coord in collect(reachable_coords)])
                 action_set = intersect(reachable_acts, action_set)
             end
-            for i=1:n_obs
-                coord = s.rock_obs.coordinates[:, i + n_initial]
+            for i = 1:n_obs
+                coord = s.rock_obs.coordinates[:, i+n_initial]
                 x = Int64(coord[1])
                 y = Int64(coord[2])
-                keepout = collect(CartesianIndices((x-m.delta:x+m.delta,y-m.delta:y+m.delta)))
+                keepout = collect(CartesianIndices((x-m.delta:x+m.delta, y-m.delta:y+m.delta)))
                 keepout_acts = OrderedSet([MEAction(coords=coord) for coord in keepout])
                 setdiff!(action_set, keepout_acts)
             end
@@ -415,15 +415,15 @@ function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
         mean_title = "belief mean t=$t"
         std_title = "belief std t=$t"
     end
-    xl = (1,size(mean,1))
-    yl = (1,size(mean,2))
-    fig1 = heatmap(mean[:,:,1], title=mean_title, fill=true, clims=(0.0, 1.0), legend=:none, ratio=1, c=cmap, xlims=xl, ylims=yl)
-    fig2 = heatmap(sqrt.(var[:,:,1]), title=std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=cmap, xlims=xl, ylims=yl)
+    xl = (1, size(mean, 1))
+    yl = (1, size(mean, 2))
+    fig1 = heatmap(mean[:, :, 1], title=mean_title, fill=true, clims=(0.0, 1.0), legend=:none, ratio=1, c=cmap, xlims=xl, ylims=yl)
+    fig2 = heatmap(sqrt.(var[:, :, 1]), title=std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=cmap, xlims=xl, ylims=yl)
     if !isempty(b.rock_obs.ore_quals)
         x = b.rock_obs.coordinates[2, :]
         y = b.rock_obs.coordinates[1, :]
-        plot!(fig1, x, y, seriestype = :scatter)
-        plot!(fig2, x, y, seriestype = :scatter)
+        plot!(fig1, x, y, seriestype=:scatter)
+        plot!(fig2, x, y, seriestype=:scatter)
         n = length(b.rock_obs)
         if n > 1
             for i = 1:n-1
@@ -433,22 +433,22 @@ function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
             end
         end
     end
-    fig = plot(fig1, fig2, layout=(1,2), size=(600,250))
+    fig = plot(fig1, fig2, layout=(1, 2), size=(600, 250))
     return fig
 end
 
 
-data_skewness(D) = [skewness(D[x,y,1:end-1]) for x in 1:size(D,1), y in 1:size(D,2)]
-data_kurtosis(D) = [kurtosis(D[x,y,1:end-1]) for x in 1:size(D,1), y in 1:size(D,2)]
+data_skewness(D) = [skewness(D[x, y, 1:end-1]) for x in 1:size(D, 1), y in 1:size(D, 2)]
+data_kurtosis(D) = [kurtosis(D[x, y, 1:end-1]) for x in 1:size(D, 1), y in 1:size(D, 2)]
 
 
 function convert2data(b::MEBelief)
-    states = cat([p.ore_map[:,:,1] for p in particles(b)]..., dims=3)
+    states = cat([p.ore_map[:, :, 1] for p in particles(b)]..., dims=3)
     observations = zeros(size(states)[1:2])
-    for (i,a) in enumerate(b.acts)
+    for (i, a) in enumerate(b.acts)
         if a.type == :drill
             x, y = a.coords.I
-            observations[x,y] = b.obs[i].ore_quality
+            observations[x, y] = b.obs[i].ore_quality
         end
     end
     return cat(states, observations; dims=3)
@@ -457,29 +457,29 @@ end
 
 function get_input_representation(b::MEBelief)
     D = convert2data(b)
-    μ = mean(D[:,:,1:end-1], dims=3)[:,:,1]
-    σ² = std(D[:,:,1:end-1], dims=3)[:,:,1]
+    μ = mean(D[:, :, 1:end-1], dims=3)[:, :, 1]
+    σ² = std(D[:, :, 1:end-1], dims=3)[:, :, 1]
     sk = data_skewness(D)
     kurt = data_kurtosis(D)
-    obs = D[:,:,end]
+    obs = D[:, :, end]
     return cat(μ, σ², sk, kurt, obs; dims=3)
 end
 
 
 plot_input_representation(b::MEBelief) = plot_input_representation(get_input_representation(b))
-function plot_input_representation(B::Array{<:Real, 3})
-    μ = B[:,:,1]
-    σ² = B[:,:,2]
-    sk = B[:,:,3]
-    kurt = B[:,:,4]
-    obs = B[:,:,5]
-    xl = (1,size(μ,1))
-    yl = (1,size(μ,2))
+function plot_input_representation(B::Array{<:Real,3})
+    μ = B[:, :, 1]
+    σ² = B[:, :, 2]
+    sk = B[:, :, 3]
+    kurt = B[:, :, 4]
+    obs = B[:, :, 5]
+    xl = (1, size(μ, 1))
+    yl = (1, size(μ, 2))
     cmap = :viridis
     fig1 = heatmap(μ, title="mean", fill=true, clims=(0, 1), legend=false, ratio=1, c=cmap, xlims=xl, ylims=yl)
     fig2 = heatmap(σ², title="stdev", fill=true, clims=(0.0, 0.2), legend=false, ratio=1, c=cmap, xlims=xl, ylims=yl)
     fig3 = heatmap(sk, title="skewness", fill=true, clims=(-1, 1), legend=false, ratio=1, c=cmap, xlims=xl, ylims=yl)
     fig4 = heatmap(kurt, title="kurtosis", fill=true, clims=(-3, 3), legend=false, ratio=1, c=cmap, xlims=xl, ylims=yl)
     fig5 = heatmap(obs, title="obs", fill=true, clims=(0, 1), legend=false, ratio=1, c=cmap, xlims=xl, ylims=yl)
-    return plot(fig1, fig2, fig3, fig4, fig5, layout=(1,5), size=(300*5,250), margin=3Plots.mm)
+    return plot(fig1, fig2, fig3, fig4, fig5, layout=(1, 5), size=(300 * 5, 250), margin=3Plots.mm)
 end

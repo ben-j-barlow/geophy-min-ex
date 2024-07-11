@@ -96,11 +96,11 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
     y_dim = gp_dist.grid_dims[2]
     mainbody_gen = truth ? d.true_mainbody_gen : d.mainbody_gen
     for i = 1:n
-        lode_map, lode_params = rand(rng, mainbody_gen)
+        lode_map, lode_params = rand(rng, mainbody_gen)  # sample mainbody
         lode_map = normalize_and_weight(lode_map, d.mainbody_weight)
 
         gp_ore_map = gp_ore_maps[i]
-        ore_map = lode_map + gp_ore_map
+        ore_map = lode_map + gp_ore_map  # mineralization and geo noise
         if apply_scale
             ore_map, lode_params = scale_sample(d, mainbody_gen, lode_map, gp_ore_map, lode_params; target_μ=d.target_μ, target_σ=d.target_σ)
         end
