@@ -112,7 +112,7 @@ include("utils.jl")
 
 export 
         generate_log_file_name,
-        prepare_logger
+        prepare_logger,
         close_logger
 include("logging.jl")
 
