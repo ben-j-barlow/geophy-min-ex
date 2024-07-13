@@ -2,7 +2,7 @@ struct MEBeliefUpdater{G} <: POMDPs.Updater
     m::MineralExplorationPOMDP
     geostats::G
     n::Int64
-    noise::Float64
+    noise::Float64  # only used in perturb_sample (og min ex code)
     abc::Bool
     abc_ϵ::Float64
     abc_dist::Function
@@ -54,16 +54,25 @@ particles(b::MEBelief) = b.particles
 # TODO: ParticleFilters.support
 POMDPs.support(b::MEBelief) = POMDPs.support(particles(b))
 
+
 function calc_K(geostats::GeoDist, rock_obs::RockObservations)
+    # Check if the geostats object is of type GeoStatsDistribution
     if isa(geostats, GeoStatsDistribution)
+        # If true, use the domain and variogram from the geostats object
         pdomain = geostats.domain
         γ = geostats.variogram
     else
+        # Otherwise, create a CartesianGrid using the grid dimensions from geostats
         pdomain = CartesianGrid(geostats.grid_dims[1], geostats.grid_dims[2])
+        # Create a SphericalVariogram using the sill, range, and nugget from geostats
         γ = SphericalVariogram(sill=geostats.sill, range=geostats.variogram[6], nugget=geostats.nugget)
     end
+
     # table = DataFrame(ore=rock_obs.ore_quals .- geostats.mean)
+
+    # Define the domain as a PointSet using the coordinates from rock_obs
     domain = PointSet(rock_obs.coordinates)
+
     # pdata = georef(table, domain)
     # vmapping = map(pdata, pdomain, (:ore,), GeoStats.NearestMapping())[:ore]
     # dlocs = Int[]
@@ -72,75 +81,84 @@ function calc_K(geostats::GeoDist, rock_obs::RockObservations)
     # end
     # dlocs = Int64[m[1] for m in vmapping]
     # 𝒟d = [centroid(pdomain, i) for i in dlocs]
+
+    # Transform the points in the domain by adding 0.5 to their coordinates
     𝒟d = [GeoStats.Point(p.coords[1] + 0.5, p.coords[2] + 0.5) for p in domain]
+
+    # Calculate the covariance matrix K
     K = GeoStats.sill(γ) .- GeoStats.pairwise(γ, 𝒟d)
+
+    # Return the covariance matrix K
     return K
 end
 
+
 function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)
-    ws = Float64[]
-    bore_coords = rock_obs.coordinates
-    n = size(bore_coords)[2]
-    ore_obs = [o for o in rock_obs.ore_quals]
-    K = calc_K(geostats, rock_obs)
-    mu = zeros(Float64, n) .+ up.m.gp_mean
-    gp_dist = MvNormal(mu, K)
+    ws = Float64[] # Initialize weights array
+    bore_coords = rock_obs.coordinates # Get borehole coordinates
+    n = size(bore_coords)[2] # Number of boreholes
+    ore_obs = [o for o in rock_obs.ore_quals] # List of ore quality observations
+    K = calc_K(geostats, rock_obs) # Calculate the covariance matrix using geostats and rock observations
+    mu = zeros(Float64, n) .+ up.m.gp_mean # Mean vector filled with the Gaussian process mean
+    gp_dist = MvNormal(mu, K) # Multivariate normal distribution based on mean vector and covariance matrix
     for s in particles
-        mb_map = s.mainbody_map
-        o_n = zeros(Float64, n)
+        mb_map = s.mainbody_map # Get the main body map from the state
+        o_n = zeros(Float64, n) # Initialize the array for normalized ore observations
         for i = 1:n
-            o_mainbody = mb_map[bore_coords[1, i], bore_coords[2, i]]
-            o_n[i] = ore_obs[i] - o_mainbody
+            o_mainbody = mb_map[bore_coords[1, i], bore_coords[2, i]] # Main body ore quality at the borehole location
+            o_n[i] = ore_obs[i] - o_mainbody # Normalize the ore observation
         end
-        w = pdf(gp_dist, o_n)
-        push!(ws, w)
+        w = pdf(gp_dist, o_n) # Calculate the weight as the probability density of the normalized observations
+        push!(ws, w) # Add the weight to the weights array
     end
-    ws .+= 1e-6
-    ws ./= sum(ws)
-    return ws
+    ws .+= 1e-6 # Add a small value to weights to avoid zero values
+    ws ./= sum(ws) # Normalize the weights
+    return ws # Return the weights
 end
+
 
 function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation;
     apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
-    sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true)
-    mainbody_params = []
-    particles = MEState[]
-    ore_quals = deepcopy(rock_obs.ore_quals)
+    sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true) # Resample particles based on weights
+    mainbody_params = [] # Initialize array for main body parameters
+    particles = MEState[] # Initialize array for resampled particles
+    ore_quals = deepcopy(rock_obs.ore_quals) # Deep copy of ore quality observations
     for s in sampled_particles
-        mainbody_param = s.mainbody_params
-        mainbody_map = s.mainbody_map
-        ore_map = s.ore_map
-        gp_ore_map = ore_map - mainbody_map
+        mainbody_param = s.mainbody_params # Get the main body parameters from the sampled state
+        mainbody_map = s.mainbody_map # Get the main body map from the sampled state
+        ore_map = s.ore_map # Get the ore map from the sampled state
+        gp_ore_map = ore_map - mainbody_map # Calculate the Gaussian process ore map
         if apply_perturbation
             if mainbody_param ∈ mainbody_params
-                mainbody_map, mainbody_param = perturb_sample(up.m.mainbody_gen, mainbody_param, up.noise)
-                max_lode = maximum(mainbody_map)
-                mainbody_map ./= max_lode
-                mainbody_map .*= up.m.mainbody_weight
-                mainbody_map = reshape(mainbody_map, up.m.grid_dim)
-                # clamp!(ore_map, 0.0, 1.0)
+                mainbody_map, mainbody_param = perturb_sample(up.m.mainbody_gen, mainbody_param, up.noise) # Perturb the main body map and parameters
+                max_lode = maximum(mainbody_map) # Get the maximum value of the main body map
+                mainbody_map ./= max_lode # Normalize the main body map
+                mainbody_map .*= up.m.mainbody_weight # Scale the main body map by the main body weight
+                mainbody_map = reshape(mainbody_map, up.m.grid_dim) # Reshape the main body map to grid dimensions
+                # clamp!(ore_map, 0.0, 1.0) # Optionally clamp the ore map values between 0 and 1
             end
         end
-        n_ore_quals = Float64[]
+        n_ore_quals = Float64[] # Initialize array for new ore qualities
         for (i, ore_qual) in enumerate(ore_quals)
-            prior_ore = mainbody_map[rock_obs.coordinates[1, i], rock_obs.coordinates[2, i], 1]
-            n_ore_qual = (ore_qual - prior_ore)
-            push!(n_ore_quals, n_ore_qual)
+            prior_ore = mainbody_map[rock_obs.coordinates[1, i], rock_obs.coordinates[2, i], 1] # Get the prior ore quality from the main body map
+            n_ore_qual = (ore_qual - prior_ore) # Normalize the ore quality
+            push!(n_ore_quals, n_ore_qual) # Add the normalized ore quality to the array
         end
-        geostats.data.ore_quals = n_ore_quals
+        geostats.data.ore_quals = n_ore_quals # Update geostats with the new ore qualities
         if resample_background_noise
-            gp_ore_map = Base.rand(up.rng, geostats)
+            gp_ore_map = Base.rand(up.rng, geostats) # Resample the Gaussian process ore map
         end
-        ore_map = gp_ore_map .+ mainbody_map
-        rock_obs_p = RockObservations(rock_obs.ore_quals, rock_obs.coordinates)
-        sp = MEState(ore_map, mainbody_param, mainbody_map, rock_obs_p,
+        ore_map = gp_ore_map .+ mainbody_map # Combine the Gaussian process ore map and the main body map
+        rock_obs_p = RockObservations(rock_obs.ore_quals, rock_obs.coordinates) # Create a new RockObservations object with the updated coordinates and ore qualities
+        sp = MEState(ore_map, mainbody_param, mainbody_map, rock_obs_p, # Create a new state with the updated ore map, parameters, and observations
             o.stopped, o.decided)
-        push!(mainbody_params, mainbody_param)
-        push!(particles, sp)
+        push!(mainbody_params, mainbody_param) # Add the main body parameters to the array
+        push!(particles, sp) # Add the new state to the particles array
     end
-    return particles
+    return particles # Return the resampled particles
 end
+
 
 function update_particles(up::MEBeliefUpdater, particles::Vector{MEState},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
