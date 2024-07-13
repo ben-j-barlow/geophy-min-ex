@@ -1,4 +1,5 @@
 function calculate_standardization(X)
+    @info "calculate_standardization(X)"
     return mean(X), std(X)
 end
 
@@ -15,6 +16,7 @@ end
 standardize_scale(x, μ, σ; kwargs...) = standardize(x, μ, σ; kwargs...) / x
 
 function save_standardization(grid_dims, shape_types=["BlobNode", "EllipseNode", "CircleNode"];
+    @info "save_standardization(grid_dims, shape_types)"
         N=10_000, seed=0xC0FFEE, file=joinpath(@__DIR__, "standardization.json"))
     if isfile(file)
         standardization_params = open(file, "r") do f
@@ -61,6 +63,7 @@ end
 standardized_adjustments(::Type{BlobNode}, μ, σ, grid_dims_key) = (μ, σ)
 standardized_adjustments(::Type{CircleNode}, μ, σ, grid_dims_key) = (μ, σ)
 function standardized_adjustments(::Type{EllipseNode}, μ, σ, grid_dims_key)
+    @info "standardized_adjustments(::Type{EllipseNode}, μ, σ, grid_dims_key)"
     if grid_dims_key == "50x50"
         return (μ+9, σ+30)
     elseif grid_dims_key == "30x30"
@@ -73,6 +76,7 @@ function standardized_adjustments(::Type{EllipseNode}, μ, σ, grid_dims_key)
 end
 
 function generate_ore_mass_samples(grid_dims, shape_types; N=1000, apply_scale=true)
+    @info "generate_ore_mass_samples(grid_dims, shape_types)"
     mass_results = Dict()
     mass_params = Dict()
     for shape_type in shape_types
@@ -93,6 +97,7 @@ function generate_ore_mass_samples(grid_dims, shape_types; N=1000, apply_scale=t
 end
 
 function generate_ore_mass_samples(m; N=1000, apply_scale=true)
+    @info "generate_ore_mass_samples(m)"
     ds0 = POMDPs.initialstate(m)
     samples = []
     masses = []
@@ -108,6 +113,7 @@ function generate_ore_mass_samples(m; N=1000, apply_scale=true)
 end
 
 function get_prescaled_parameters(ShapeType::Type{<:ShapeNode}, grid_dims; file=joinpath(@__DIR__, "standardization.json"))
+    @info "get_prescaled_parameters(ShapeType::Type{<:ShapeNode}, grid_dims)"
     if isfile(file)
         standardization_params = open(file, "r") do f
             JSON.parse(read(f, String))

@@ -9,6 +9,7 @@ mutable struct LUParams
 end
 #function LUParams(rng::AbstractRNG, γ::Variogram, domain::CartesianGrid)
 function LUParams(γ::Variogram, domain::CartesianGrid)
+    @info "LUParams(γ::Variogram, domain::CartesianGrid)"
     z₁ = Float64[0.0]
     d₂ = Float64[0.0]
     slocs = [l for l in 1:nelements(domain)] # if l ∉ dlocs]
@@ -38,6 +39,7 @@ end
 end
 
 function update!(d::GeoStatsDistribution, o::RockObservations)
+    @info "update!(d::GeoStatsDistribution, o::RockObservations)"
     d.data.ore_quals = o.ore_quals
     d.data.coordinates = o.coordinates
 
@@ -75,6 +77,7 @@ function update!(d::GeoStatsDistribution, o::RockObservations)
 end
 
 function calc_covs(d::GeoStatsDistribution, problem)
+    @info "calc_covs(d::GeoStatsDistribution, problem)"
     pdata = data(problem)
     pdomain = domain(problem)
 
@@ -120,6 +123,7 @@ optionally using multiple processes `procs`.
 Default implementation calls `solvesingle` in parallel.
 """
 function solve_nopreproc(problem::SimulationProblem, solver::LUGS, preproc::Dict; procs=[GeoStats.GeoStatsBase.myid()])
+    @info "solve_nopreproc(problem::SimulationProblem, solver::LUGS, preproc::Dict; procs=[GeoStats.GeoStatsBase.myid()])"
     # sanity checks
     @assert targets(solver) ⊆ name.(variables(problem)) "invalid variables in solver"
 
@@ -164,6 +168,7 @@ function solve_nopreproc(problem::SimulationProblem, solver::LUGS, preproc::Dict
 end
 
 function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, n::Int64=1)
+    @info "Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, n::Int64=1)"
     if isempty(d.data.coordinates) # Unconditional simulation
         problem = SimulationProblem(d.domain, (:ore => Float64), n)
     else

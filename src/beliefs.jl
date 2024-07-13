@@ -41,6 +41,7 @@ Base.:(==)(b1::MEBelief, b2::MEBelief) = isequal(b1, b2)
 
 
 function POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)
+    @info "POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)"
     particles = rand(up.rng, d, up.n)
     init_rocks = up.m.initial_data
     rock_obs = RockObservations(init_rocks.ore_quals, init_rocks.coordinates)
@@ -56,6 +57,7 @@ POMDPs.support(b::MEBelief) = POMDPs.support(particles(b))
 
 
 function calc_K(geostats::GeoDist, rock_obs::RockObservations)
+    @info "calc_K(geostats::GeoDist, rock_obs::RockObservations)"
     # Check if the geostats object is of type GeoStatsDistribution
     if isa(geostats, GeoStatsDistribution)
         # If true, use the domain and variogram from the geostats object
@@ -94,6 +96,7 @@ end
 
 
 function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)
+    @info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)"
     ws = Float64[] # Initialize weights array
     bore_coords = rock_obs.coordinates # Get borehole coordinates
     n = size(bore_coords)[2] # Number of boreholes
@@ -120,6 +123,7 @@ end
 function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation;
     apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
+    @info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)"
     sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true) # Resample particles based on weights
     mainbody_params = [] # Initialize array for main body parameters
     particles = MEState[] # Initialize array for resampled particles
@@ -162,6 +166,7 @@ end
 
 function update_particles(up::MEBeliefUpdater, particles::Vector{MEState},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
+    @info "update_particles"
     wp = reweight(up, geostats, particles, rock_obs)
     pp = resample(up, particles, wp, geostats, rock_obs, a, o)
     return pp
@@ -170,6 +175,7 @@ end
 
 function update_particles_perturbed_inject(up::MEBeliefUpdater, particles::Vector{MEState},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
+    @info "update_particles_perturbed_inject"
     m = 50 # TODO: parameterize `m`
     wp = reweight(up, geostats, particles, rock_obs)
     injected_particles = resample(up, particles, wp, geostats, rock_obs, a, o; apply_perturbation=true, n=m)
@@ -181,6 +187,7 @@ end
 
 
 function reweight_abc(up::MEBeliefUpdater, particles::Vector, rock_obs::RockObservations)
+    @info "reweight_abc(up::MEBeliefUpdater, particles::Vector, rock_obs::RockObservations)"
     ws = Float64[]
     ϵ = up.abc_ϵ
     rho = up.abc_dist
@@ -205,18 +212,22 @@ end
 
 function update_particles_abc(up::MEBeliefUpdater, particles::Vector{MEState},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
+    @info "update_particles_abc"
     wp = reweight_abc(up, particles, rock_obs)
     pp = resample(up, particles, wp, geostats, rock_obs, a, o; apply_perturbation=false, resample_background_noise=false)
     return pp
 end
 
 function inject_particles(up::MEBeliefUpdater, n::Int64)
+    @info "inject_particles(up::MEBeliefUpdater, n::Int64)"
     d = POMDPs.initialstate_distribution(up.m) # TODO. Keep as part of `MEBeliefUpdater`
     return rand(up.rng, d, n)
 end
 
 function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     a::MEAction, o::MEObservation)
+    @info "POMDPs.update(up::MEBeliefUpdater, b::MEBelief, a::MEAction, o::MEObservation)"
+
     if a.type != :drill
         bp_particles = MEState[] # MEState[p for p in b.particles]
         for p in b.particles
@@ -287,6 +298,7 @@ end
 Base.rand(b::MEBelief) = rand(Random.GLOBAL_RNG, b)
 
 function summarize(b::MEBelief)
+    @info "summarize(b::MEBelief)"
     (x, y, z) = size(b.particles[1].ore_map)
     μ = zeros(Float64, x, y, z)
     w = 1.0 / length(b.particles)
@@ -303,6 +315,8 @@ function summarize(b::MEBelief)
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
+    @info "POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)"
+
     if b.stopped
         return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
     else
@@ -352,6 +366,8 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
+    @info "POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)"
+
     o = b.sr_belief.o
     s = rand(m.rng, b.sr_belief.dist)[1]
     if o.stopped
@@ -403,6 +419,8 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)
+    @info "POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)"
+
     if o.stopped
         return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
     else
@@ -415,16 +433,21 @@ function POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)
 end
 
 function mean_var(b::MEBelief)
+    @info "mean_var(b::MEBelief)"
+
     vars = [s[1] for s in b.particles]
     mean(vars)
 end
 
 function std_var(b::MEBelief)
+    @info "std_var(b::MEBelief)"
+
     vars = [s[1] for s in b.particles]
     std(vars)
 end
 
 function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
+    @info "Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)"
     mean, var = summarize(b)
     if t == nothing
         mean_title = "belief mean"
@@ -461,6 +484,7 @@ data_kurtosis(D) = [kurtosis(D[x, y, 1:end-1]) for x in 1:size(D, 1), y in 1:siz
 
 
 function convert2data(b::MEBelief)
+    @info "convert2data(b::MEBelief)"
     states = cat([p.ore_map[:, :, 1] for p in particles(b)]..., dims=3)
     observations = zeros(size(states)[1:2])
     for (i, a) in enumerate(b.acts)
@@ -474,6 +498,8 @@ end
 
 
 function get_input_representation(b::MEBelief)
+    @info "get_input_representation(b::MEBelief)"
+
     D = convert2data(b)
     μ = mean(D[:, :, 1:end-1], dims=3)[:, :, 1]
     σ² = std(D[:, :, 1:end-1], dims=3)[:, :, 1]
@@ -486,6 +512,7 @@ end
 
 plot_input_representation(b::MEBelief) = plot_input_representation(get_input_representation(b))
 function plot_input_representation(B::Array{<:Real,3})
+    @info "plot_input_representation(B::Array{<:Real,3)"
     μ = B[:, :, 1]
     σ² = B[:, :, 2]
     sk = B[:, :, 3]

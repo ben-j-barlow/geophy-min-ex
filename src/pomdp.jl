@@ -1,4 +1,5 @@
 function GeoStatsDistribution(p::MineralExplorationPOMDP; truth=false)
+    @info "GeoStatsDistribution(p::MineralExplorationPOMDP; truth=false)"
     grid_dims = truth ? p.high_fidelity_dim : p.grid_dim
     variogram = SphericalVariogram(sill=p.variogram[1], range=p.variogram[2],
                                     nugget=p.variogram[3])
@@ -13,6 +14,7 @@ function GeoStatsDistribution(p::MineralExplorationPOMDP; truth=false)
 end
 
 function GSLIBDistribution(p::MineralExplorationPOMDP)
+    @info "GSLIBDistribution(p::MineralExplorationPOMDP)"
     variogram = (1, 1, 0.0, 0.0, 0.0, p.variogram[2], p.variogram[2], 1.0)
     # variogram::Tuple = (1, 1, 0.0, 0.0, 0.0, 30.0, 30.0, 1.0)
     return GSLIBDistribution(grid_dims=p.grid_dim, n=p.grid_dim,
@@ -27,6 +29,7 @@ Sample coordinates from a Cartesian grid of dimensions given by dims and return
 them in an array
 """
 function sample_coords(dims::Tuple{Int, Int, Int}, n::Int)
+    @info "sample_coords(dims::Tuple{Int, Int, Int}, n::Int)"
     idxs = CartesianIndices(dims)
     samples = sample(idxs, n)
     sample_array = Array{Int64}(undef, 2, n)
@@ -38,6 +41,7 @@ function sample_coords(dims::Tuple{Int, Int, Int}, n::Int)
 end
 
 function sample_initial(p::MineralExplorationPOMDP, n::Integer)
+    @info "sample_initial(p::MineralExplorationPOMDP, n::Integer)"
     coords, coords_array = sample_coords(p.grid_dim, n)
     dist = GeoStatsDistribution(p)
     state = rand(p.rng, dist)
@@ -46,6 +50,7 @@ function sample_initial(p::MineralExplorationPOMDP, n::Integer)
 end
 
 function sample_initial(p::MineralExplorationPOMDP, coords::Array)
+    @info "sample_initial(p::MineralExplorationPOMDP, coords::Array)"
     n = length(coords)
     coords_array = Array{Int64}(undef, 2, n)
     for (i, sample) in enumerate(coords)
@@ -59,6 +64,8 @@ function sample_initial(p::MineralExplorationPOMDP, coords::Array)
 end
 
 function initialize_data!(p::MineralExplorationPOMDP, n::Integer)
+    @info "initialize_data!(p::MineralExplorationPOMDP, n::Integer)"
+
     new_rock_obs = sample_initial(p, n)
     append!(p.initial_data.ore_quals, new_rock_obs.ore_quals)
     p.initial_data.coordinates = hcat(p.initial_data.coordinates, new_rock_obs.coordinates)
@@ -66,6 +73,8 @@ function initialize_data!(p::MineralExplorationPOMDP, n::Integer)
 end
 
 function initialize_data!(p::MineralExplorationPOMDP, coords::Array)
+    @info "initialize_data!(p::MineralExplorationPOMDP, coords::Array)"
+
     new_rock_obs = sample_initial(p, coords)
     append!(p.initial_data.ore_quals, new_rock_obs.ore_quals)
     p.initial_data.coordinates = hcat(p.initial_data.coordinates, new_rock_obs.coordinates)
@@ -76,6 +85,7 @@ POMDPs.discount(::MineralExplorationPOMDP) = 0.99
 POMDPs.isterminal(m::MineralExplorationPOMDP, s::MEState) = s.decided
 
 function POMDPs.initialstate(m::MineralExplorationPOMDP)
+    @info "POMDPs.initialstate(m::MineralExplorationPOMDP)"
     true_gp_dist = m.geodist_type(m; truth=true)
     gp_dist = m.geodist_type(m)
     MEInitStateDist(true_gp_dist, gp_dist, m.mainbody_weight,
@@ -85,6 +95,7 @@ function POMDPs.initialstate(m::MineralExplorationPOMDP)
 end
 
 function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth::Bool=false, apply_scale::Bool=false)
+    @info "Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth::Bool=false, apply_scale::Bool=false)"
     gp_dist = truth ? d.true_gp_distribution : d.gp_distribution
     gp_ore_maps = Base.rand(rng, gp_dist, n)
     if n == 1
@@ -118,6 +129,7 @@ end
 Base.rand(d::MEInitStateDist, n::Int=1; kwargs...) = rand(d.rng, d, n; kwargs...)
 
 function normalize_and_weight(lode_map::AbstractArray, mainbody_weight::Real)
+    @info "normalize_and_weight(lode_map::AbstractArray, mainbody_weight::Real)"
     max_lode = maximum(lode_map)
     lode_map ./= max_lode
     lode_map .*= mainbody_weight
@@ -127,10 +139,12 @@ end
 
 calc_massive(pomdp::MineralExplorationPOMDP, s::MEState) = calc_massive(s.ore_map, pomdp.massive_threshold, pomdp.dim_scale)
 function calc_massive(ore_map::AbstractArray, massive_threshold::Real, dim_scale::Real)
+    @info "calc_massive(ore_map::AbstractArray, massive_threshold::Real, dim_scale::Real)"
     return dim_scale*sum(ore_map .>= massive_threshold)
 end
 
 function extraction_reward(m::MineralExplorationPOMDP, s::MEState)
+    @info "extraction_reward(m::MineralExplorationPOMDP, s::MEState)"
     truth = size(s.mainbody_map) == m.high_fidelity_dim
     dim_scale = truth ? m.target_dim_scale : m.dim_scale
     r_massive = calc_massive(s.ore_map, m.massive_threshold, dim_scale)
@@ -144,6 +158,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, b::MEBe
 end
 
 function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Random.AbstractRNG)
+    @info "POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Random.AbstractRNG)"
     if a ∉ POMDPs.actions(m, s)
         error("Invalid Action $a from state $s")
     end
@@ -187,6 +202,7 @@ end
 
 
 function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
+    @info "POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)"
     stopped = s.stopped
     decided = s.decided
     a_type = a.type
@@ -205,6 +221,7 @@ end
 
 
 function POMDPs.actions(m::MineralExplorationPOMDP)
+    @info "POMDPs.actions(m::MineralExplorationPOMDP)"
     idxs = CartesianIndices(m.grid_dim[1:2])
     bore_actions = reshape(collect(idxs), prod(m.grid_dim[1:2]))
     actions = MEAction[MEAction(type=:stop), MEAction(type=:mine),
@@ -217,6 +234,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP)
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, s::MEState)
+    @info "POMDPs.actions(m::MineralExplorationPOMDP, s::MEState)"
     if s.decided
         return MEAction[]
     elseif s.stopped
@@ -262,6 +280,7 @@ end
 
 function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
                     a::MEAction, sp::MEState, o::MEObservation)
+    @info "POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)"
     w = 0.0
     if a.type != :drill
         w = o.ore_quality == nothing ? 1.0 : 0.0
@@ -277,6 +296,7 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
 end
 
 function high_fidelity_obs(m::MineralExplorationPOMDP, subsurface_map::Array, a::MEAction)
+    @info "high_fidelity_obs(m::MineralExplorationPOMDP, subsurface_map::Array, a::MEAction)"
     if size(subsurface_map) == m.grid_dim
         return subsurface_map[a.coords[1], a.coords[2], 1]
     else

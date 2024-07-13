@@ -10,6 +10,7 @@ end
 # end
 
 function kernel(x::MEAction, y::MEAction, l::Float64, sf::Float64)
+    @info "kernel(x::MEAction, y::MEAction, l::Float64, sf::Float64)"
     if x.type == y.type
         d = (x.coords[1] - y.coords[1])^2 + (x.coords[2] - y.coords[2])^2
         return sf * exp(-d / l^2)
@@ -20,6 +21,7 @@ end
 
 function gp_posterior(X::Vector{MEAction}, x::Vector{MEAction},
     y::Vector{Float64}, ns, l, sf, sn)
+    @info "gp_posterior(X::Vector{MEAction}, x::Vector{MEAction}, y::Vector{Float64}, ns, l, sf, sn)"
     m = length(X)
     n = length(x)
     Kxx = zeros(Float64, n, n)
@@ -45,6 +47,7 @@ end
 
 function approx_posterior(X::Vector{MEAction}, x::Vector{MEAction},
     y::Vector{Float64}, ns, l, sf, sn)
+    @info "approx_posterior(X::Vector{MEAction}, x::Vector{MEAction}, y::Vector{Float64}, ns, l, sf, sn)"
     m = length(X)
     n = length(x)
     W = zeros(Float64, m, n)
@@ -61,6 +64,7 @@ function approx_posterior(X::Vector{MEAction}, x::Vector{MEAction},
 end
 
 function expected_improvement(μ, σ², f)
+    @info "expected_improvement(μ, σ², f)"
     σ = sqrt.(σ²)
     dist = Normal(0.0, 1.0)
     Δ = μ .- f
@@ -74,6 +78,7 @@ end
 
 function POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP,
     b::MEBelief, h)
+    @info "POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP, b::MEBelief, h)"
     a_idxs = h.tree.tried[h.node]
     tried_actions = h.tree.a_labels[a_idxs]::Vector{MEAction}
     action_values = h.tree.q[a_idxs]
@@ -98,6 +103,7 @@ end
 
 function POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP,
     b::POMCPOW.StateBelief, h)
+    @info "POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP, b::POMCPOW.StateBelief, h)"
     a_idxs = h.tree.tried[h.node]
     tried_actions = h.tree.a_labels[a_idxs]::Vector{MEAction}
     action_values = h.tree.q[a_idxs]

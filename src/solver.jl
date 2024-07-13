@@ -3,6 +3,7 @@
 end
 
 function sample_ucb_drill(mean, var, idxs)
+    @info "sample_ucb_drill(mean, var, idxs)"
     scores = belief_scores(mean, var)
     weights = Float64[]
     for idx in idxs
@@ -13,6 +14,7 @@ function sample_ucb_drill(mean, var, idxs)
 end
 
 function belief_scores(m, v)
+    @info "belief_scores(m, v)"
     norm_mean = m[:,:,1]./(maximum(m[:,:,1]) - minimum(m[:,:,1]))
     norm_mean .-= minimum(norm_mean)
     s = v[:,:,1]
@@ -29,6 +31,7 @@ using Infiltrator
 
 function POMCPOW.next_action(o::NextActionSampler, pomdp::MineralExplorationPOMDP,
                             b::MEBelief, h)
+    @info "POMCPOW.next_action(o::NextActionSampler, pomdp::MineralExplorationPOMDP, b::MEBelief, h)"
     if h isa Vector
         tried_idxs = h
     elseif h.tree isa POMCPOWTree
@@ -67,6 +70,7 @@ end
 
 function POMCPOW.next_action(obj::NextActionSampler, pomdp::MineralExplorationPOMDP,
                             b::POMCPOW.StateBelief, h)
+    @info "POMCPOW.next_action(obj::NextActionSampler, pomdp::MineralExplorationPOMDP, b::POMCPOW.StateBelief, h)"
     o = b.sr_belief.o
     # s = rand(pomdp.rng, b.sr_belief.dist)[1]
     tried_idxs = h.tree.tried[h.node]
@@ -105,6 +109,7 @@ end
 POMCPOW.updater(p::ExpertPolicy) = MEBeliefUpdater(p.m, 1)
 
 function POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.BeliefNode)
+    @info "POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.BeliefNode)"
     srb = node.tree.sr_beliefs[node.node]
     cv = srb.dist
     particles = MEState[]
@@ -133,6 +138,7 @@ function POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.Bel
 end
 
 function POMDPs.action(p::ExpertPolicy, b::MEBelief)
+    @info "POMDPs.action(p::ExpertPolicy, b::MEBelief)"
     volumes = Float64[]
     for s in b.particles
         v = calc_massive(p.m, s)
@@ -172,6 +178,7 @@ RandomSolver(;rng=Random.GLOBAL_RNG) = RandomSolver(rng)
 POMDPs.solve(solver::RandomSolver, problem::Union{POMDP,MDP}) = POMCPOW.RandomPolicy(solver.rng, problem, BeliefUpdaters.PreviousObservationUpdater())
 
 function leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.BeliefNode, ::Any)
+    @info "leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.BeliefNode, ::Any)"
     if s.stopped
         γ = POMDPs.discount(pomdp)
     else
@@ -204,6 +211,7 @@ struct GridPolicy <: Policy
 end
 
 function GridPolicy(m::MineralExplorationPOMDP, n::Int, grid_size::Int)
+    @info "GridPolicy(m::MineralExplorationPOMDP, n::Int, grid_size::Int)"
     grid_start_i = (m.grid_dim[1] - grid_size)/2
     grid_start_j = (m.grid_dim[2] - grid_size)/2
     grid_end_i = grid_start_i + grid_size
@@ -222,6 +230,7 @@ function GridPolicy(m::MineralExplorationPOMDP, n::Int, grid_size::Int)
 end
 
 function POMDPs.action(p::GridPolicy, b::MEBelief)
+    @info "POMDPs.action(p::GridPolicy, b::MEBelief)"
     n_bores = length(b.rock_obs)
     if b.stopped
         volumes = Float64[]

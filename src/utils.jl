@@ -8,6 +8,7 @@ function plot_history(hs::Vector, n_max::Int64=10,
                         title::Union{Nothing, String}=nothing,
                         y_label::Union{Nothing, String}=nothing,
                         box_plot::Bool=false)
+    @info "plot_history(hs::Vector, n_max::Int64=10, title::Union{Nothing, String}=nothing, y_label::Union{Nothing, String}=nothing, box_plot::Bool=false)"
     μ = Float64[]
     σ = Float64[]
     vals_vector = Vector{Float64}[]
@@ -46,6 +47,7 @@ function plot_history(hs::Vector, n_max::Int64=10,
 end
 
 function gen_cases(ds0::MEInitStateDist, n::Int64, save_dir::Union{String, Nothing}=nothing)
+    @info "gen_cases(ds0::MEInitStateDist, n::Int64, save_dir::Union{String, Nothing}=nothing)"
     states = MEState[]
     for i = 1:n
         push!(states, rand(ds0.rng, ds0))
@@ -61,6 +63,8 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
                 display_figs::Bool=true, save_dir::Union{Nothing, String}=nothing,
                 return_final_belief=false, return_all_trees=false, collect_training_data=false,
                 cmap=:viridis, verbose::Bool=true)
+    @info "start of run trial"
+
     if verbose
         println("Initializing belief...")
     end
@@ -235,6 +239,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
 end
 
 function plot_ore_map(ore_map, cmap=:viridis, title="true ore map")
+    @info "plot_ore_map(ore_map, cmap=:viridis, title=\"true ore map\")"
     xl = (0.5, size(ore_map,1)+0.5)
     yl = (0.5, size(ore_map,2)+0.5)
     return heatmap(ore_map[:,:,1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
@@ -242,6 +247,7 @@ end
 
 
 function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)
+    @info "plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)"
     xl = (0.5, size(ore_map,1)+0.5)
     yl = (0.5, size(ore_map,2)+0.5)
     s_massive = ore_map .>= massive_threshold
@@ -251,6 +257,7 @@ function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, t
 end
 
 function plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; t=0, verbose::Bool=true)
+    @info "plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; t=0, verbose::Bool=true)"
     vols = [calc_massive(m, p) for p in b0.particles]
     mean_vols = round(mean(vols), digits=2)
     std_vols = round(std(vols), digits=2)
