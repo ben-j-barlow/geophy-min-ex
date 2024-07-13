@@ -43,6 +43,7 @@ end
 @with_kw struct MEAction
     type::Symbol = :drill
     coords::CartesianIndex = CartesianIndex(0, 0)
+    change_in_bank_angle::Int = 0 
 end
 
 abstract type GeoDist end
