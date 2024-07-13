@@ -3,6 +3,17 @@
     coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
 end
 
+@with_kw mutable struct GeophysicalObservations
+    reading::Matrix{Vector{Float64}} = Matrix{Vector{Float64}}(undef, 0, 0)
+    function GeophysicalObservations(x_dim::Int, y_dim::Int)
+        obj = new(Matrix{Vector{Float64}}(undef, x_dim, y_dim))
+        for i in 1:x_dim, j in 1:y_dim
+            obj.reading[i, j] = Vector{Float64}()
+        end
+        return obj
+    end
+end
+
 struct MEState{MB}
     ore_map::Array{Float64}  # 3D array of ore_quality values for each grid-cell
     mainbody_params::MB #  Diagonal variance of main ore-body generator
@@ -10,6 +21,12 @@ struct MEState{MB}
     rock_obs::RockObservations
     stopped::Bool # Whether or not STOP action has been taken
     decided::Bool # Whether or not the extraction decision has been made
+    agent_heading::Float64
+    agent_pos_x::Float64
+    agent_pos_y::Float64
+    agent_velocity::Int
+    agent_bank_angle::Int  # bank angle of agent
+    geophysical_obs::GeophysicalObservations
 end
 
 function Base.length(obs::RockObservations)

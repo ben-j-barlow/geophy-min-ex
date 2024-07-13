@@ -115,8 +115,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         if apply_scale
             ore_map, lode_params = scale_sample(d, mainbody_gen, lode_map, gp_ore_map, lode_params; target_μ=d.target_μ, target_σ=d.target_σ)
         end
-        state = MEState(ore_map, lode_params, lode_map,
-                RockObservations(), false, false)
+        state = MEState(ore_map, lode_params, lode_map, RockObservations(), false, false, 45.0, 0.0, 0.0, 20, 0, GeophysicalObservations(x_dim, y_dim))
         push!(states, state)
     end
     if n == 1
@@ -196,7 +195,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
     r = reward(m, s, a)
-    sp = MEState(s.ore_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p)
+    sp = MEState(s.ore_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_velocity, s.agent_bank_angle, s.geophysical_obs)
     return (sp=sp, o=obs, r=r)
 end
 

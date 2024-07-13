@@ -40,7 +40,8 @@ export
         MineralExplorationPOMDP,
         MEInitStateDist,
         MEBelief,
-        MainbodyGen
+        MainbodyGen,
+        GeophysicalObservations
 include("common.jl")
 
 export
