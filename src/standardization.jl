@@ -16,8 +16,8 @@ end
 standardize_scale(x, μ, σ; kwargs...) = standardize(x, μ, σ; kwargs...) / x
 
 function save_standardization(grid_dims, shape_types=["BlobNode", "EllipseNode", "CircleNode"];
+    N=10_000, seed=0xC0FFEE, file=joinpath(@__DIR__, "standardization.json"))
     @info "save_standardization(grid_dims, shape_types)"
-        N=10_000, seed=0xC0FFEE, file=joinpath(@__DIR__, "standardization.json"))
     if isfile(file)
         standardization_params = open(file, "r") do f
             JSON.parse(read(f, String))
