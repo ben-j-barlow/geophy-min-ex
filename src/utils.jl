@@ -234,11 +234,12 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     return return_values
 end
 
-function plot_ore_map(ore_map, cmap=:viridis)
+function plot_ore_map(ore_map, cmap=:viridis, title="true ore map")
     xl = (0.5, size(ore_map,1)+0.5)
     yl = (0.5, size(ore_map,2)+0.5)
-    return heatmap(ore_map[:,:,1], title="true ore field", fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
+    return heatmap(ore_map[:,:,1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
 end
+
 
 function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)
     xl = (0.5, size(ore_map,1)+0.5)
