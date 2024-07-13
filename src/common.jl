@@ -37,6 +37,7 @@ struct MEObservation
     ore_quality::Union{Float64, Nothing}
     stopped::Bool
     decided::Bool
+    geophysical_reading::Union{Float64, Nothing}
 end
 
 @with_kw struct MEAction

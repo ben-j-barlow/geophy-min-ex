@@ -167,17 +167,17 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
 
     # drill then stop then mine or abandon
     if a_type == :stop && !stopped && !decided
-        obs = MEObservation(nothing, true, false)
+        obs = MEObservation(nothing, true, false, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = false
     elseif a_type == :abandon && stopped && !decided
-        obs = MEObservation(nothing, true, true)
+        obs = MEObservation(nothing, true, true, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
     elseif a_type == :mine && stopped && !decided
-        obs = MEObservation(nothing, true, true)
+        obs = MEObservation(nothing, true, true, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
@@ -190,7 +190,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         n_bores = length(rock_obs_p)
         stopped_p = n_bores >= m.max_bores
         decided_p = false
-        obs = MEObservation(ore_obs, stopped_p, false)
+        obs = MEObservation(ore_obs, stopped_p, false, nothing)
     else
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
