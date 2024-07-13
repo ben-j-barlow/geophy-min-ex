@@ -3,6 +3,7 @@ module MineralExploration
 using BeliefUpdaters
 using CSV
 using DataFrames
+using Dates
 using DelimitedFiles
 using Distributions
 using Distances # for KL and JS
@@ -15,6 +16,7 @@ using JSON
 using KernelDensity
 using Luxor
 using LinearAlgebra
+using Logging
 using MCTS
 using Parameters
 using Plots; default(fontfamily="Computer Modern", framestyle=:box) # LaTex-style
@@ -107,5 +109,11 @@ export
         plot_mass_map,
         plot_volume
 include("utils.jl")
+
+export 
+        generate_log_file_name,
+        prepare_logger
+        close_logger
+include("logging.jl")
 
 end
