@@ -93,7 +93,24 @@ function POMDPs.initialstate(m::MineralExplorationPOMDP)
     MEInitStateDist(true_gp_dist, gp_dist, m.mainbody_weight,
                     m.true_mainbody_gen, m.mainbody_gen,
                     m.massive_threshold, m.dim_scale, m.target_dim_scale,
-                    m.target_mass_params[1], m.target_mass_params[2], m.rng) #m.rng passes global
+                    m.target_mass_params[1], m.target_mass_params[2], m.rng, m.sigma, m.upscale_factor) #m.rng passes global
+end
+
+function smooth_map_with_filter(map::Array{Float64}, sigma::Float64, upscale_factor::Int)
+    map_2d = reshape(map, 50, 50) # Remove the third dimension since it is 1
+    interpolated_map = interpolate(map_2d, BSpline(Linear())) # Increase the resolution using interpolation
+
+    # Generate the high resolution grid points and image
+    new_dims = (size(map_2d, 1) * upscale_factor, size(map_2d, 2) * upscale_factor)
+    high_res_x = range(1, stop=size(map_2d, 1), length=new_dims[1])  
+    high_res_y = range(1, stop=size(map_2d, 2), length=new_dims[2])
+    high_res_map_array = [interpolated_map(x, y) for x in high_res_x, y in high_res_y]
+
+    # Apply Gaussian filter to smooth the image
+    smooth_map = imfilter(high_res_map_array, Kernel.gaussian(sigma))
+    
+    #reshape to original dimensionality
+    return reshape(smooth_map, new_dims[1], new_dims[2], 1)
 end
 
 function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth::Bool=false, apply_scale::Bool=false)
@@ -117,7 +134,9 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         if apply_scale
             ore_map, lode_params = scale_sample(d, mainbody_gen, lode_map, gp_ore_map, lode_params; target_μ=d.target_μ, target_σ=d.target_σ)
         end
-        state = MEState(ore_map, lode_params, lode_map, RockObservations(), false, false, 45.0, [0.0], [0.0], 20, 0, GeophysicalObservations(x_dim, y_dim))
+        smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
+
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, 45.0, [0.0], [0.0], 20, 0, GeophysicalObservations(x_dim, y_dim))
         push!(states, state)
     end
     if n == 1
@@ -171,7 +190,11 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         new_bank_angle = s.agent_bank_angle + (rand([-5, 5]) * DEG_TO_RAD)
     end
     new_bank_angle = clamp(new_bank_angle, -50 * DEG_TO_RAD, 50 * DEG_TO_RAD)
-    pos_x, pos_y, heading = update_agent_state(last(s.agent_pos_x), last(s.agent_pos_y), s.agent_heading, new_bank_angle, s.agent_velocity, m.grid_element_length)
+    pos_x, pos_y, heading = update_agent_state(last(s.agent_pos_x), last(s.agent_pos_y), s.agent_heading, new_bank_angle, s.agent_velocity, m.smooth_grid_element_length)
+    
+    # plane at position (10.2, 12.7) in continuous scale should map to (11, 13) in discrete scale
+    pos_x_int = convert(Int, ceil(pos_x))
+    pos_y_int = convert(Int, ceil(pos_y))
 
     # drill then stop then mine or abandon
     if a_type == :stop && !stopped && !decided
@@ -179,16 +202,19 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = false
+        geo_obs_p = deepcopy(s.geophysical_obs)
     elseif a_type == :abandon && stopped && !decided
         obs = MEObservation(nothing, true, true, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
+        geo_obs_p = deepcopy(s.geophysical_obs)
     elseif a_type == :mine && stopped && !decided
         obs = MEObservation(nothing, true, true, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
+        geo_obs_p = deepcopy(s.geophysical_obs)
     elseif a_type ==:drill && !stopped && !decided
         ore_obs = high_fidelity_obs(m, s.ore_map, a)
         a_coords = reshape(Int64[a.coords[1] a.coords[2]], 2, 1)
@@ -198,12 +224,24 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         n_bores = length(rock_obs_p)
         stopped_p = n_bores >= m.max_bores
         decided_p = false
+        geo_obs_p = deepcopy(s.geophysical_obs)
         obs = MEObservation(ore_obs, stopped_p, false, nothing)
+    elseif a_type == :fly
+        single_obs = geophysical_obs(s.smooth_map, pos_x_int, pos_y_int, m.geophysical_noise_std_dev)
+
+        geo_obs_p = deepcopy(s.geophysical_obs)
+        # append observation to 2x2 matrix of vectors
+        ore_map_x = pos_x_int / m.upscale_factor
+        ore_map_y = pos_y_int / m.upscale_factor
+        
+        push!(geo_obs_p.reading[ore_map_x, ore_map_y], single_obs)
+        #TODO: implement stopped/decided code
+        obs = MEObservation(nothing, false, false, single_obs)
     else
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
     r = reward(m, s, a)
-    sp = MEState(s.ore_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading, push!(s.agent_pos_x, pos_x), push!(s.agent_pos_y, pos_y), s.agent_velocity, s.agent_bank_angle, s.geophysical_obs)
+    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading, push!(s.agent_pos_x, pos_x), push!(s.agent_pos_y, pos_y), s.agent_velocity, s.agent_bank_angle, geo_obs_p)
     return (sp=sp, o=obs, r=r)
 end
 
@@ -313,7 +351,18 @@ function high_fidelity_obs(m::MineralExplorationPOMDP, subsurface_map::Array, a:
     end
 end
 
-function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, v::Int, normalizing_factor::Int, dt::Int = 1, g::Float64 = 9.81)
+function geophysical_obs(x::Int, y::Int, smooth_map::Array{Float64}, std_dev::Float64)
+    # geophysical equivalent of high_fidelity_obs
+    # add noise to the observation
+
+    # ideas
+    # use continuous coordinates to generate weighted average of 4 map points
+    # let bank angle influence noise
+    return smooth_map[x, y, 1] + rand(Normal(0, std_dev), 1)[1]
+end
+
+
+function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, v::Int, normalizing_factor::Float64, dt::Int = 1, g::Float64 = 9.81)
     # psi - current heading
     # phi - current bank angle, in radians
     # v - current velocity (remains constant)

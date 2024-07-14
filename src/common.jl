@@ -16,6 +16,7 @@ end
 
 struct MEState{MB}
     ore_map::Array{Float64}  # 3D array of ore_quality values for each grid-cell
+    smooth_map::Array{Float64}  # 3D array of smoothed values for each grid-cell
     mainbody_params::MB #  Diagonal variance of main ore-body generator
     mainbody_map::Array{Float64}
     rock_obs::RockObservations
@@ -84,6 +85,10 @@ abstract type MainbodyGen end
     c_exp::Float64 = 1.0
 
     grid_element_length::Int = 60  # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
+    upscale_factor::Int = 10  # factor to upscale the grid by for smooth, higher resolution map
+    smooth_grid_element_length::Float64 = grid_element_length / upscale_factor
+    sigma::Float64 = 10  # for smoothing map with gaussian filter
+    geophysical_noise_std_dev::Float64 = 0.25
 end
 
 struct MEInitStateDist  # prior over state space
@@ -100,4 +105,6 @@ struct MEInitStateDist  # prior over state space
     target_μ::Float64
     target_σ::Float64
     rng::AbstractRNG
+    sigma::Float64  # for smoothing map with gaussian filter
+    upscale_factor::Int
 end
