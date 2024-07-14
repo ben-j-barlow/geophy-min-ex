@@ -22,8 +22,8 @@ struct MEState{MB}
     stopped::Bool # Whether or not STOP action has been taken
     decided::Bool # Whether or not the extraction decision has been made
     agent_heading::Float64
-    agent_pos_x::Float64
-    agent_pos_y::Float64
+    agent_pos_x::Vector{Float64}
+    agent_pos_y::Vector{Float64}
     agent_velocity::Int
     agent_bank_angle::Int  # bank angle of agent
     geophysical_obs::GeophysicalObservations
@@ -82,6 +82,8 @@ abstract type MainbodyGen end
     target_mass_params::Tuple{Real, Real} = (extraction_cost, extraction_cost/3) # target mean and std when standardizing ore mass distributions
     rng::AbstractRNG = Random.GLOBAL_RNG
     c_exp::Float64 = 1.0
+
+    grid_element_length::Int = 60  # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
 end
 
 struct MEInitStateDist  # prior over state space

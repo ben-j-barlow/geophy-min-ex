@@ -136,7 +136,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
 
         b_fig = plot(bp, t; cmap=cmap)
         b_hist, vols, mean_vols, std_vols = plot_volume(m, bp, r_massive; t=t, verbose=false)
-
+        
         if verbose
             @show t
             @show a.type
@@ -174,6 +174,15 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
                 open(path, "a") do io
                     writedlm(io, reshape(b_std, :, 1))
                 end
+                path = string(save_dir, "pos.txt")
+                open(path, "w") do file
+                    # Iterate over the vectors and write each pair to the file
+                    for i in 1:length(sp.agent_pos_x)
+                        x = sp.agent_pos_x[i]
+                        y = sp.agent_pos_y[i]
+                        println(file, "$x $y")
+                    end
+                end
             end
         end
         final_belief = bp
@@ -183,6 +192,10 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         if collect_training_data && a.type == :drill # NOTE that :stop and beyond have the same belief representation and obs.
             data = BetaZeroTrainingData(get_input_representation(bp), nothing, nothing)
             push!(training_data, data)
+        end
+        if isa(save_dir, String)
+            path = string(save_dir, "plane_trajectory.png")
+            savefig(plot_plane_trajectory(sp.agent_pos_x, sp.agent_pos_y), path)
         end
     end
     if verbose
@@ -237,6 +250,14 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     end
     return return_values
 end
+
+
+function plot_plane_trajectory(x_list::Vector{Float64}, y_list::Vector{Float64})
+    @info "plot_plane_trajectory(x_list::Vector{Float64}, y_list::Vector{Float64})"
+    return plot(x_list, y_list, label="Trajectory", xlabel="X Position (meters)", ylabel="Y Position (meters)", 
+        title="Aircraft Trajectory", legend=:topright, grid=true, axis=:equal)
+end
+
 
 function plot_ore_map(ore_map, cmap=:viridis, title="true ore map")
     @info "plot_ore_map(ore_map, cmap=:viridis, title=\"true ore map\")"

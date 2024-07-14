@@ -1,3 +1,5 @@
+const DEG_TO_RAD = π / 180
+
 function GeoStatsDistribution(p::MineralExplorationPOMDP; truth=false)
     @info "GeoStatsDistribution(p::MineralExplorationPOMDP; truth=false)"
     grid_dims = truth ? p.high_fidelity_dim : p.grid_dim
@@ -115,7 +117,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         if apply_scale
             ore_map, lode_params = scale_sample(d, mainbody_gen, lode_map, gp_ore_map, lode_params; target_μ=d.target_μ, target_σ=d.target_σ)
         end
-        state = MEState(ore_map, lode_params, lode_map, RockObservations(), false, false, 45.0, 0.0, 0.0, 20, 0, GeophysicalObservations(x_dim, y_dim))
+        state = MEState(ore_map, lode_params, lode_map, RockObservations(), false, false, 45.0, [0.0], [0.0], 20, 0, GeophysicalObservations(x_dim, y_dim))
         push!(states, state)
     end
     if n == 1
@@ -128,7 +130,7 @@ end
 Base.rand(d::MEInitStateDist, n::Int=1; kwargs...) = rand(d.rng, d, n; kwargs...)
 
 function normalize_and_weight(lode_map::AbstractArray, mainbody_weight::Real)
-    @info "normalize_and_weight(lode_map::AbstractArray, mainbody_weight::Real)"
+    #@info "normalize_and_weight(lode_map::AbstractArray, mainbody_weight::Real)"
     max_lode = maximum(lode_map)
     lode_map ./= max_lode
     lode_map .*= mainbody_weight
@@ -165,6 +167,14 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     decided = s.decided
     a_type = a.type
 
+    if a.type == :fly
+        new_bank_angle = s.agent_bank_angle + (a.change_in_bank_angle * DEG_TO_RAD)
+    else 
+        new_bank_angle = s.agent_bank_angle + (rand([-5, 5]) * DEG_TO_RAD)
+    end
+    new_bank_angle = clamp(new_bank_angle, -50 * DEG_TO_RAD, 50 * DEG_TO_RAD)
+    pos_x, pos_y, heading = update_agent_state(last(s.agent_pos_x), last(s.agent_pos_y), s.agent_heading, new_bank_angle, s.agent_velocity, m.grid_element_length)
+
     # drill then stop then mine or abandon
     if a_type == :stop && !stopped && !decided
         obs = MEObservation(nothing, true, false, nothing)
@@ -195,7 +205,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
     r = reward(m, s, a)
-    sp = MEState(s.ore_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_velocity, s.agent_bank_angle, s.geophysical_obs)
+    sp = MEState(s.ore_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading, push!(s.agent_pos_x, pos_x), push!(s.agent_pos_y, pos_y), s.agent_velocity, s.agent_bank_angle, s.geophysical_obs)
     return (sp=sp, o=obs, r=r)
 end
 
@@ -303,4 +313,22 @@ function high_fidelity_obs(m::MineralExplorationPOMDP, subsurface_map::Array, a:
         hf_coords = trunc.(Int, a.coords.I ./ m.ratio[1:2])
         return subsurface_map[hf_coords[1], hf_coords[2], 1]
     end
+end
+
+function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, v::Int, normalizing_factor::Int, dt::Int = 1, g::Float64 = 9.81)
+    # psi - current heading
+    # phi - current bank angle, in radians
+    # v - current velocity (remains constant)
+    # normalizing_factor - factor to normalize x and y position by, corresponds to arbitrary length represented by 1 grid square
+
+    # get change in heading, x and y
+    psi_dot = g * tan(phi) / v
+    x_dot = v * cos(psi) / normalizing_factor
+    y_dot = v * sin(psi) / normalizing_factor
+
+    # update heading, x and y
+    psi += psi_dot * dt
+    x += x_dot * dt
+    y += y_dot * dt
+    return x, y, psi
 end
