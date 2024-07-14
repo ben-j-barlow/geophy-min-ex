@@ -130,7 +130,6 @@ end
 Base.rand(d::MEInitStateDist, n::Int=1; kwargs...) = rand(d.rng, d, n; kwargs...)
 
 function normalize_and_weight(lode_map::AbstractArray, mainbody_weight::Real)
-    #@info "normalize_and_weight(lode_map::AbstractArray, mainbody_weight::Real)"
     max_lode = maximum(lode_map)
     lode_map ./= max_lode
     lode_map .*= mainbody_weight
@@ -140,7 +139,6 @@ end
 
 calc_massive(pomdp::MineralExplorationPOMDP, s::MEState) = calc_massive(s.ore_map, pomdp.massive_threshold, pomdp.dim_scale)
 function calc_massive(ore_map::AbstractArray, massive_threshold::Real, dim_scale::Real)
-    @info "calc_massive(ore_map::AbstractArray, massive_threshold::Real, dim_scale::Real)"
     return dim_scale*sum(ore_map .>= massive_threshold)
 end
 

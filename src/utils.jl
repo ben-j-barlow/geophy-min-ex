@@ -129,7 +129,9 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     if collect_training_data
         training_data = [BetaZeroTrainingData(get_input_representation(b0), nothing, nothing)]
     end
+    @info "\n\n First timestep"
     for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=m.max_bores+2, rng=m.rng)
+        @info "\n\n timestep $t"
         discounted_return += POMDPs.discount(m)^(t - 1)*r
         dist = sqrt(sum(([a.coords[1], a.coords[2]] .- 25.0).^2)) #TODO only for single fixed
         last_action = a.type
