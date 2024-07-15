@@ -28,6 +28,7 @@ struct MEState{MB}
     agent_velocity::Int
     agent_bank_angle::Int  # bank angle of agent
     geophysical_obs::GeophysicalObservations
+    timestep::Int
 end
 
 function Base.length(obs::RockObservations)
@@ -89,6 +90,7 @@ abstract type MainbodyGen end
     smooth_grid_element_length::Float64 = grid_element_length / upscale_factor
     sigma::Float64 = 10  # for smoothing map with gaussian filter
     geophysical_noise_std_dev::Float64 = 0.25
+    max_timesteps::Int = 100
 end
 
 struct MEInitStateDist  # prior over state space

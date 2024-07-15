@@ -160,7 +160,7 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
 
         smooth_map = smooth_map_with_filter(ore_map, up.sigma, up.upscale_factor)
         sp = MEState(ore_map, smooth_map, mainbody_param, mainbody_map, rock_obs_p, # Create a new state with the updated ore map, parameters, and observations
-                    o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_velocity, s.agent_bank_angle, s.geophysical_obs)
+                    o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_velocity, s.agent_bank_angle, s.geophysical_obs, s.timestep)
         push!(mainbody_params, mainbody_param) # Add the main body parameters to the array
         push!(particles, sp) # Add the new state to the particles array
     end
@@ -235,7 +235,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     if a.type != :drill
         bp_particles = MEState[] # MEState[p for p in b.particles]
         for p in b.particles
-            s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_velocity, p.agent_bank_angle, p.geophysical_obs) # Update the state with new observations
+            s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_velocity, p.agent_bank_angle, p.geophysical_obs, p.timestep) # Update the state with new observations
             push!(bp_particles, s)
         end
         bp_rock = RockObservations(ore_quals=deepcopy(b.rock_obs.ore_quals),

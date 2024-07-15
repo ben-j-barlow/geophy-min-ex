@@ -136,7 +136,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         end
         smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
 
-        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, 45.0, [0.0], [0.0], 20, 0, GeophysicalObservations(x_dim, y_dim))
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, 45.0, [0.0], [0.0], 20, 0, GeophysicalObservations(x_dim, y_dim), 0)
         push!(states, state)
     end
     if n == 1
@@ -175,6 +175,8 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, b::MEBe
     error("POMDPs.gen with a belief passed is has not been implemented (yet) — Robert Moss")
 end
 
+
+
 function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Random.AbstractRNG)
     @info "POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Random.AbstractRNG)"
     if a ∉ POMDPs.actions(m, s)
@@ -196,6 +198,8 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     pos_x_int = convert(Int, ceil(pos_x))
     pos_y_int = convert(Int, ceil(pos_y))
 
+    timestep = s.timestep + 1
+    
     # drill then stop then mine or abandon
     if a_type == :stop && !stopped && !decided
         obs = MEObservation(nothing, true, false, nothing)
@@ -225,7 +229,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         stopped_p = n_bores >= m.max_bores
         decided_p = false
         geo_obs_p = deepcopy(s.geophysical_obs)
-        obs = MEObservation(ore_obs, stopped_p, false, nothing)
+        obs = MEObservation(ore_obs, stopped_p, decided_p, nothing)
     elseif a_type == :fly
         single_obs = geophysical_obs(s.smooth_map, pos_x_int, pos_y_int, m.geophysical_noise_std_dev)
 
@@ -233,15 +237,16 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         # append observation to 2x2 matrix of vectors
         ore_map_x = pos_x_int / m.upscale_factor
         ore_map_y = pos_y_int / m.upscale_factor
-        
+        stopped_p = timestep >= m.max_timesteps
+        decided_p = false
         push!(geo_obs_p.reading[ore_map_x, ore_map_y], single_obs)
         #TODO: implement stopped/decided code
-        obs = MEObservation(nothing, false, false, single_obs)
+        obs = MEObservation(nothing, stopped_p, decided_p, single_obs)
     else
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
     r = reward(m, s, a)
-    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading, push!(s.agent_pos_x, pos_x), push!(s.agent_pos_y, pos_y), s.agent_velocity, s.agent_bank_angle, geo_obs_p)
+    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading, push!(s.agent_pos_x, pos_x), push!(s.agent_pos_y, pos_y), s.agent_velocity, s.agent_bank_angle, geo_obs_p, timestep)
     return (sp=sp, o=obs, r=r)
 end
 
