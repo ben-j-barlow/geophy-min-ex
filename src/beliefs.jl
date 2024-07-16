@@ -26,6 +26,7 @@ struct MEBelief{G}
     decided::Bool
     geostats::G #GSLIB or GeoStats
     up::MEBeliefUpdater ## include the belief updater
+    timestep::Int
 end
 
 # Ensure MEBeliefs can be compared when adding them to dictionaries (using `hash`, `isequal` and `==`)
@@ -49,7 +50,7 @@ function POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)
     rock_obs = RockObservations(init_rocks.ore_quals, init_rocks.coordinates)
     acts = MEAction[]
     obs = MEObservation[]
-    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up)
+    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, 0)
 end
 
 # TODO: ParticleFilters.particles
@@ -292,10 +293,11 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     bp_decided = o.decided
 
     return MEBelief(bp_particles, bp_rock, bp_acts, bp_obs, bp_stopped,
-        bp_decided, bp_geostats, up)
+        bp_decided, bp_geostats, up, b.timestep + 1)
 end
 
 function Base.rand(rng::AbstractRNG, b::MEBelief)
+    @info "Base.rand(rng::AbstractRNG, b::MEBelief)"
     return rand(rng, b.particles)
 end
 
@@ -320,106 +322,138 @@ end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
     @info "POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)"
-
-    if b.stopped
-        return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
-    else
-        action_set = OrderedSet(POMDPs.actions(m))
-        n_initial = length(m.initial_data)
-        if !isempty(b.rock_obs.ore_quals)
-            n_obs = length(b.rock_obs.ore_quals) - n_initial
-            if m.max_movement != 0 && n_obs > 0
-                d = m.max_movement
-                drill_s = b.rock_obs.coordinates[:, end]
-                x = drill_s[1]
-                y = drill_s[2]
-                reachable_coords = CartesianIndices((x-d:x+d, y-d:y+d))
-                reachable_acts = MEAction[]
-                for coord in reachable_coords
-                    dx = abs(x - coord[1])
-                    dy = abs(y - coord[2])
-                    d2 = sqrt(dx^2 + dy^2)
-                    if d2 <= d
-                        push!(reachable_acts, MEAction(coords=coord))
+    @info "$(b.timestep)"
+    if m.mineral_exploration_mode == "borehole"
+        if b.stopped
+            return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
+        else
+            action_set = OrderedSet(POMDPs.actions(m))
+            n_initial = length(m.initial_data)
+            if !isempty(b.rock_obs.ore_quals)
+                n_obs = length(b.rock_obs.ore_quals) - n_initial
+                if m.max_movement != 0 && n_obs > 0
+                    d = m.max_movement
+                    drill_s = b.rock_obs.coordinates[:, end]
+                    x = drill_s[1]
+                    y = drill_s[2]
+                    reachable_coords = CartesianIndices((x-d:x+d, y-d:y+d))
+                    reachable_acts = MEAction[]
+                    for coord in reachable_coords
+                        dx = abs(x - coord[1])
+                        dy = abs(y - coord[2])
+                        d2 = sqrt(dx^2 + dy^2)
+                        if d2 <= d
+                            push!(reachable_acts, MEAction(coords=coord))
+                        end
                     end
+                    push!(reachable_acts, MEAction(type=:stop))
+                    reachable_acts = OrderedSet(reachable_acts)
+                    # reachable_acts = OrderedSet([MEAction(coords=coord) for coord in collect(reachable_coords)])
+                    action_set = intersect(reachable_acts, action_set)
                 end
-                push!(reachable_acts, MEAction(type=:stop))
-                reachable_acts = OrderedSet(reachable_acts)
-                # reachable_acts = OrderedSet([MEAction(coords=coord) for coord in collect(reachable_coords)])
-                action_set = intersect(reachable_acts, action_set)
-            end
-            for i = 1:n_obs
-                coord = b.rock_obs.coordinates[:, i+n_initial]
-                x = Int64(coord[1])
-                y = Int64(coord[2])
-                keepout = collect(CartesianIndices((x-m.delta:x+m.delta, y-m.delta:y+m.delta)))
-                keepout_acts = OrderedSet([MEAction(coords=coord) for coord in keepout])
-                setdiff!(action_set, keepout_acts)
-            end
-            if n_obs < m.min_bores
+                for i = 1:n_obs
+                    coord = b.rock_obs.coordinates[:, i+n_initial]
+                    x = Int64(coord[1])
+                    y = Int64(coord[2])
+                    keepout = collect(CartesianIndices((x-m.delta:x+m.delta, y-m.delta:y+m.delta)))
+                    keepout_acts = OrderedSet([MEAction(coords=coord) for coord in keepout])
+                    setdiff!(action_set, keepout_acts)
+                end
+                if n_obs < m.min_bores
+                    delete!(action_set, MEAction(type=:stop))
+                end
+            elseif m.min_bores > 0
                 delete!(action_set, MEAction(type=:stop))
             end
-        elseif m.min_bores > 0
-            delete!(action_set, MEAction(type=:stop))
+            delete!(action_set, MEAction(type=:mine))
+            delete!(action_set, MEAction(type=:abandon))
+            return collect(action_set)
         end
-        delete!(action_set, MEAction(type=:mine))
-        delete!(action_set, MEAction(type=:abandon))
-        return collect(action_set)
+    elseif m.mineral_exploration_mode == "geophysical"
+        # Q: under what conditions is b.stopped true?
+        if b.stopped
+            return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
+        end
+        
+        # Q: does b.timestep actually increase?
+        acts = MEAction[]
+        if b.timestep >= m.min_timesteps
+            push!(acts, MEAction(type=:mine))
+            push!(acts, MEAction(type=:abandon))
+        end
+        if b.timestep <= m.max_timesteps
+            push!(acts, MEAction(change_in_bank_angle=-5))
+            push!(acts, MEAction(change_in_bank_angle=0))
+            push!(acts, MEAction(change_in_bank_angle=5))
+        end
+        return collect(acts)
     end
     return MEAction[]
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
     @info "POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)"
+    if m.mineral_exploration_mode == "borehole"
+        o = b.sr_belief.o
+        
+        @info "b $(typeof(b))"  # POMCPOW.StateBelief{POWNodeBelief{MEState, MEAction, MEObservation, MineralExplorationPOMDP}}
+        @info "b.sr_belief.dist $(typeof(b.sr_belief.dist))" # CategoricalVector{Tuple{MEState, Float64}}
+        @info "b.sr_belief.particles $(typeof(b.sr_belief.particles))" # ErrorException("type POWNodeBelief has no field particles")
+        @info "b.sr_belief properties $(propertynames(b.sr_belief))" # properties (:model, :a, :o, :dist)
+        s = rand(m.rng, b.sr_belief.dist)[1]
+        @info "s type $(typeof(s))" # s type MEState{Vector{Any}}
 
-    o = b.sr_belief.o
-    s = rand(m.rng, b.sr_belief.dist)[1]
-    if o.stopped
-        return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
-    else
-        action_set = OrderedSet(POMDPs.actions(m))
-        n_initial = length(m.initial_data)
-        if !isempty(s.rock_obs.ore_quals)
-            n_obs = length(s.rock_obs.ore_quals) - n_initial
-            if m.max_movement != 0 && n_obs > 0
-                d = m.max_movement
-                drill_s = s.rock_obs.coordinates[:, end]
-                x = drill_s[1]
-                y = drill_s[2]
-                reachable_coords = CartesianIndices((x-d:x+d, y-d:y+d))
-                reachable_acts = MEAction[]
-                for coord in reachable_coords
-                    dx = abs(x - coord[1])
-                    dy = abs(y - coord[2])
-                    d2 = sqrt(dx^2 + dy^2)
-                    if d2 <= d
-                        push!(reachable_acts, MEAction(coords=coord))
+        if o.stopped
+            return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
+        else
+            action_set = OrderedSet(POMDPs.actions(m))
+            n_initial = length(m.initial_data)
+            if !isempty(s.rock_obs.ore_quals)
+                n_obs = length(s.rock_obs.ore_quals) - n_initial
+                if m.max_movement != 0 && n_obs > 0
+                    d = m.max_movement
+                    drill_s = s.rock_obs.coordinates[:, end]
+                    x = drill_s[1]
+                    y = drill_s[2]
+                    reachable_coords = CartesianIndices((x-d:x+d, y-d:y+d))
+                    reachable_acts = MEAction[]
+                    for coord in reachable_coords
+                        dx = abs(x - coord[1])
+                        dy = abs(y - coord[2])
+                        d2 = sqrt(dx^2 + dy^2)
+                        if d2 <= d
+                            push!(reachable_acts, MEAction(coords=coord))
+                        end
                     end
+                    push!(reachable_acts, MEAction(type=:stop))
+                    reachable_acts = OrderedSet(reachable_acts)
+                    # reachable_acts = OrderedSet([MEAction(coords=coord) for coord in collect(reachable_coords)])
+                    action_set = intersect(reachable_acts, action_set)
                 end
-                push!(reachable_acts, MEAction(type=:stop))
-                reachable_acts = OrderedSet(reachable_acts)
-                # reachable_acts = OrderedSet([MEAction(coords=coord) for coord in collect(reachable_coords)])
-                action_set = intersect(reachable_acts, action_set)
-            end
-            for i = 1:n_obs
-                coord = s.rock_obs.coordinates[:, i+n_initial]
-                x = Int64(coord[1])
-                y = Int64(coord[2])
-                keepout = collect(CartesianIndices((x-m.delta:x+m.delta, y-m.delta:y+m.delta)))
-                keepout_acts = OrderedSet([MEAction(coords=coord) for coord in keepout])
-                setdiff!(action_set, keepout_acts)
-            end
-            if n_obs < m.min_bores
+                for i = 1:n_obs
+                    coord = s.rock_obs.coordinates[:, i+n_initial]
+                    x = Int64(coord[1])
+                    y = Int64(coord[2])
+                    keepout = collect(CartesianIndices((x-m.delta:x+m.delta, y-m.delta:y+m.delta)))
+                    keepout_acts = OrderedSet([MEAction(coords=coord) for coord in keepout])
+                    setdiff!(action_set, keepout_acts)
+                end
+                if n_obs < m.min_bores
+                    delete!(action_set, MEAction(type=:stop))
+                end
+            elseif m.min_bores > 0
                 delete!(action_set, MEAction(type=:stop))
             end
-        elseif m.min_bores > 0
-            delete!(action_set, MEAction(type=:stop))
+            # delete!(action_set, MEAction(type=:mine))
+            # delete!(action_set, MEAction(type=:abandon))
+            return collect(action_set)
         end
-        # delete!(action_set, MEAction(type=:mine))
-        # delete!(action_set, MEAction(type=:abandon))
-        return collect(action_set)
+        return MEAction[]
+    elseif m.mineral_exploration_mode == "geophysical"
+        if o.stopped
+            return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
+        end
     end
-    return MEAction[]
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)
