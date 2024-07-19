@@ -91,6 +91,7 @@ abstract type MainbodyGen end
     sigma::Float64 = 10  # for smoothing map with gaussian filter
     geophysical_noise_std_dev::Float64 = 0.25
     max_timesteps::Int = 100
+    mineral_exploration_mode = "borehole" # borehole or geophysical
 end
 
 struct MEInitStateDist  # prior over state space
