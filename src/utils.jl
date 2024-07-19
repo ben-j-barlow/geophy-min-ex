@@ -240,6 +240,9 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         display(rel_err_fig)
         display(vols_fig)
     end
+    
+    @info "decision $last_action"
+    @info "n drills $n_drills"
     return_values = (discounted_return, dists, abs_errs, rel_errs, vol_stds, n_drills, r_massive, last_action)
     if return_final_belief
         return_values = (return_values..., final_belief)

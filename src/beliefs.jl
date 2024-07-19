@@ -93,6 +93,8 @@ function calc_K(geostats::GeoDist, rock_obs::RockObservations)
     # Calculate the covariance matrix K
     K = GeoStats.sill(γ) .- GeoStats.pairwise(γ, 𝒟d)
 
+    @info "covar matrix $(typeof(K))"
+    @info "covar matrix $(size(K))"
     # Return the covariance matrix K
     return K
 end
@@ -397,9 +399,11 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
         o = b.sr_belief.o
         
         @info "b $(typeof(b))"  # POMCPOW.StateBelief{POWNodeBelief{MEState, MEAction, MEObservation, MineralExplorationPOMDP}}
+        @info "b.sr_belief $(typeof(b.sr_belief))"
         @info "b.sr_belief.dist $(typeof(b.sr_belief.dist))" # CategoricalVector{Tuple{MEState, Float64}}
         @info "b.sr_belief.particles $(typeof(b.sr_belief.particles))" # ErrorException("type POWNodeBelief has no field particles")
         @info "b.sr_belief properties $(propertynames(b.sr_belief))" # properties (:model, :a, :o, :dist)
+        @info "b.sr_belief fieldnames $(fieldnames(typeof(b.sr_belief)))"
         s = rand(m.rng, b.sr_belief.dist)[1]
         @info "s type $(typeof(s))" # s type MEState{Vector{Any}}
 
