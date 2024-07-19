@@ -257,17 +257,30 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
     decided = s.decided
     a_type = a.type
 
-    if a_type in [:stop, :abandon]
-        r = 0.0
-    elseif a_type == :mine
-        r = extraction_reward(m, s)
-    elseif a_type ==:drill
-        r = -m.drill_cost
+    if m.mineral_exploration_mode == "borehole"
+        if a_type in [:stop, :abandon]
+            r = 0.0
+        elseif a_type == :mine
+            r = extraction_reward(m, s)
+        elseif a_type ==:drill
+            r = -m.drill_cost
+        else
+            error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
+        end
+    elseif m.mineral_exploration_mode == "geophysical"
+        if a_type == :fly
+            r = -m.fly_cost
+        elseif a_type == :mine
+            r = extraction_reward(m, s)
+        elseif a_type in [:stop, :abandon]
+            r = 0.0
+        end
     else
-        error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
+        error("Invalid Mineral Exploration Mode: $(m.mineral_exploration_mode)")
     end
     return r
 end
+
 
 
 function POMDPs.actions(m::MineralExplorationPOMDP)
