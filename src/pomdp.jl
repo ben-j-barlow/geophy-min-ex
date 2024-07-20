@@ -136,7 +136,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         end
         smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
 
-        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, 45.0, [0.0], [0.0], 20, 0, GeophysicalObservations(x_dim, y_dim), 0)
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, 45.0, [0.0], [0.0], 20, 0, GeophysicalObservations(), 0)
         push!(states, state)
     end
     if n == 1
@@ -239,7 +239,8 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         ore_map_y = pos_y_int / m.upscale_factor
         stopped_p = timestep >= m.max_timesteps
         decided_p = false
-        push!(geo_obs_p.reading[ore_map_x, ore_map_y], single_obs)
+        push!(geo_obs_p.reading, single_obs)
+        geo_obs_p.coordinates = hcat(geo_obs_p.coordinates, reshape(Int64[a.coords[1] a.coords[2]], 2, 1))
         #TODO: implement stopped/decided code
         obs = MEObservation(nothing, stopped_p, decided_p, single_obs)
     else

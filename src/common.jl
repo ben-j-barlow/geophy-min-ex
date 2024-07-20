@@ -4,14 +4,8 @@
 end
 
 @with_kw mutable struct GeophysicalObservations
-    reading::Matrix{Vector{Float64}} = Matrix{Vector{Float64}}(undef, 0, 0)
-    function GeophysicalObservations(x_dim::Int, y_dim::Int)
-        obj = new(Matrix{Vector{Float64}}(undef, x_dim, y_dim))
-        for i in 1:x_dim, j in 1:y_dim
-            obj.reading[i, j] = Vector{Float64}()
-        end
-        return obj
-    end
+    reading::Vector{Float64} = Vector{Float64}()
+    coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
 end
 
 struct MEState{MB}
@@ -69,7 +63,6 @@ abstract type MainbodyGen end
     delta::Int64 = 1 # Minimum distance between wells (grid coordinates)
     grid_spacing::Int64 = 0 # Number of cells in between each cell in which wells can be placed
     drill_cost::Float64 = 0.1
-    strike_reward::Float64 = 1.0
     extraction_cost::Float64 = 150.0
     extraction_lcb::Float64 = 0.1
     extraction_ucb::Float64 = 0.1
@@ -80,7 +73,6 @@ abstract type MainbodyGen end
     mainbody_weight::Float64 = 0.6  
     true_mainbody_gen::MainbodyGen = BlobNode(grid_dims=high_fidelity_dim) # high-fidelity true mainbody generator
     mainbody_gen::MainbodyGen = BlobNode(grid_dims=grid_dim)
-    massive_threshold::Float64 = 0.7
     target_mass_params::Tuple{Real, Real} = (extraction_cost, extraction_cost/3) # target mean and std when standardizing ore mass distributions
     rng::AbstractRNG = Random.GLOBAL_RNG
     c_exp::Float64 = 1.0
@@ -93,6 +85,8 @@ abstract type MainbodyGen end
     max_timesteps::Int = 100
     mineral_exploration_mode = "borehole" # borehole or geophysical
     fly_cost::Float64 = 0.01
+    massive_threshold::Float64 = 0.7
+    strike_reward::Float64 = 1.0
 end
 
 struct MEInitStateDist  # prior over state space

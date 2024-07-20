@@ -99,6 +99,15 @@ function calc_K(geostats::GeoDist, rock_obs::RockObservations)
     return K
 end
 
+function calc_K(geostats::GeoDist, geophysical_obs::GeophysicalObservations)
+    @info "calc_K(geostats::GeoDist, geophysical_obs::GeophysicalObservations)"
+    # exactly the same implementation as calc_K(geostats::GeoDist, rock_obs::RockObservations)
+    # difference is some indexes of K will correspond to the same coordinates rather than all being unique
+    γ = geostats.variogram
+    𝒟d = [GeoStats.Point(p.coords[1] + 0.5, p.coords[2] + 0.5) for p in PointSet(geophysical_obs.coordinates)]
+    K = GeoStats.sill(γ) .- GeoStats.pairwise(γ, 𝒟d)
+    return K
+end
 
 function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)
     @info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)"
@@ -372,25 +381,38 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
             return collect(action_set)
         end
     elseif m.mineral_exploration_mode == "geophysical"
-        # Q: under what conditions is b.stopped true?
+        # if stopped, return mine & abandon
         if b.stopped
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
         end
-        
-        # Q: does b.timestep actually increase?
+
+        # if not stopped but stop bound satisfied, return stop
+        if calculate_stop_bound(m, b)
+            return MEAction[MEAction(type=:stop)]
+        end
+
+        # if not stopped and stop bound not satisfied, return 3 flying actions
         acts = MEAction[]
-        if b.timestep >= m.min_timesteps
-            push!(acts, MEAction(type=:mine))
-            push!(acts, MEAction(type=:abandon))
-        end
-        if b.timestep <= m.max_timesteps
-            push!(acts, MEAction(change_in_bank_angle=-5))
-            push!(acts, MEAction(change_in_bank_angle=0))
-            push!(acts, MEAction(change_in_bank_angle=5))
-        end
+        push!(acts, MEAction(type=:fly, change_in_bank_angle=-5))
+        push!(acts, MEAction(type=:fly, change_in_bank_angle=0))
+        push!(acts, MEAction(type=:fly, change_in_bank_angle=5))
         return collect(acts)
     end
-    return MEAction[]
+    error("Invalid mineral exploration mode")
+end
+
+function calculate_stop_bound(m::MineralExplorationPOMDP, b::MEBelief)
+    @info "calculate_stop_bound()"
+    volumes = Float64[]
+    for p in b.particles
+        v = calc_massive(pomdp, p)
+        push!(volumes, v)
+    end
+    mean_volume = Statistics.mean(volumes)
+    volume_std = Statistics.std(volumes)
+    lcb = mean_volume - volume_std*m.extraction_lcb
+    ucb = mean_volume + volume_std*m.extraction_ucb
+    return lcb >= m.extraction_cost || ucb <= m.extraction_cost
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
