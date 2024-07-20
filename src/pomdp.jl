@@ -344,16 +344,39 @@ end
 function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
                     a::MEAction, sp::MEState, o::MEObservation)
     @info "POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)"
-    w = 0.0
-    if a.type != :drill
-        w = o.ore_quality == nothing ? 1.0 : 0.0
-    else
-        o_mainbody = high_fidelity_obs(m, s.mainbody_map, a)
-        o_gp = (o.ore_quality - o_mainbody)
-        mu = m.gp_mean
-        sigma = sqrt(m.variogram[1])
-        point_dist = Normal(mu, sigma)
-        w = pdf(point_dist, o_gp)
+    # this function tries to capture the likelihood of observing a particular magnitude of noise
+    # the value of noise is the difference between the observation and the mainbody value at the location
+
+    # in the borehole version, the noise only stems from the background variation in the subsurface
+    # in the geophysical version, the noise stems from the smoothing of the map, the sensor noise, and the background variation in the subsurface
+    
+    if m.mineral_exploration_mode == "borehole"
+        w = 0.0
+        if a.type != :drill
+            w = o.ore_quality == nothing ? 1.0 : 0.0
+        else
+            o_mainbody = high_fidelity_obs(m, s.mainbody_map, a)  # mainbody value at drill location
+
+            # what is the likelihood of a particular value given the Gaussian process on noise that we expect?
+
+            o_gp = (o.ore_quality - o_mainbody)  # difference between observation and mainbody value
+            mu = m.gp_mean  # pre-defined mean of the noise GP
+            sigma = sqrt(m.variogram[1])  # pre-defined sill of the noise GP
+            point_dist = Normal(mu, sigma)  # dist
+            w = pdf(point_dist, o_gp)  # weight
+        end
+    elseif m.mineral_exploration_mode == "geophysical"
+        if a.type != :fly # mine, abdndon and stop all lead to o.geophysical_reading == nothing evaluating to true
+            w = o.geophysical_reading == nothing ? 1.0 : 0.0
+        else
+            o_mainbody = high_fidelity_obs(m, s.mainbody_map, a)  # mainbody value at drill location
+
+            o_gp = (o.geophysical_reading - o_mainbody)  # difference between observation and mainbody value
+            point_dist = Normal(m.gp_mean, sqrt(m.variogramp[1]))  # dist
+            w = pdf(point_dist, o_gp)  # weight
+        end
+    else 
+        error("Invalid Mineral Exploration Mode: $(m.mineral_exploration_mode)")
     end
     return w
 end
