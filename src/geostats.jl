@@ -29,6 +29,7 @@ end
 @with_kw struct GeoStatsDistribution <: GeoDist
     grid_dims::Tuple{Int64, Int64, Int64} = (50, 50, 1)
     data::RockObservations = RockObservations()
+    geophysical_data::GeophysicalObservations = GeophysicalObservations()
     domain::CartesianGrid = CartesianGrid{Int64}(grid_dims[1], grid_dims[2])
     mean::Float64 = 0.3
     variogram::Variogram = SphericalVariogram(sill=0.005, range=30.0,
@@ -37,6 +38,9 @@ end
     #lu_params::LUParams = LUParams(rng, variogram, domain)
     lu_params::LUParams = LUParams(variogram, domain)
 end
+
+
+
 
 function update!(d::GeoStatsDistribution, o::RockObservations)
     @info "update!(d::GeoStatsDistribution, o::RockObservations)"

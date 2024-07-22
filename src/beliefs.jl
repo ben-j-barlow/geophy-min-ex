@@ -26,7 +26,7 @@ struct MEBelief{G}
     decided::Bool
     geostats::G #GSLIB or GeoStats
     up::MEBeliefUpdater ## include the belief updater
-    timestep::Int
+    geophysical_obs::GeophysicalObservations
 end
 
 # Ensure MEBeliefs can be compared when adding them to dictionaries (using `hash`, `isequal` and `==`)
@@ -50,7 +50,7 @@ function POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)
     rock_obs = RockObservations(init_rocks.ore_quals, init_rocks.coordinates)
     acts = MEAction[]
     obs = MEObservation[]
-    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, 0)
+    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, GeophysicalObservations())
 end
 
 # TODO: ParticleFilters.particles
@@ -104,7 +104,7 @@ function calc_K(geostats::GeoDist, geophysical_obs::GeophysicalObservations)
     # exactly the same implementation as calc_K(geostats::GeoDist, rock_obs::RockObservations)
     # difference is some indexes of K will correspond to the same coordinates rather than all being unique
     γ = geostats.variogram
-    𝒟d = [GeoStats.Point(p.coords[1] + 0.5, p.coords[2] + 0.5) for p in PointSet(geophysical_obs.coordinates)]
+    𝒟d = [GeoStats.Point(p.coords[1] + 0.5, p.coords[2] + 0.5) for p in PointSet(geophysical_obs.base_map_coordinates)]
     K = GeoStats.sill(γ) .- GeoStats.pairwise(γ, 𝒟d)
     return K
 end
@@ -172,7 +172,7 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
 
         smooth_map = smooth_map_with_filter(ore_map, up.sigma, up.upscale_factor)
         sp = MEState(ore_map, smooth_map, mainbody_param, mainbody_map, rock_obs_p, # Create a new state with the updated ore map, parameters, and observations
-                    o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_velocity, s.agent_bank_angle, s.geophysical_obs, s.timestep)
+            o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_bank_angle, s.geophysical_obs, s.timestep)
         push!(mainbody_params, mainbody_param) # Add the main body parameters to the array
         push!(particles, sp) # Add the new state to the particles array
     end
@@ -244,48 +244,75 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     a::MEAction, o::MEObservation)
     @info "POMDPs.update(up::MEBeliefUpdater, b::MEBelief, a::MEAction, o::MEObservation)"
 
-    if a.type != :drill
-        bp_particles = MEState[] # MEState[p for p in b.particles]
-        for p in b.particles
-            s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_velocity, p.agent_bank_angle, p.geophysical_obs, p.timestep) # Update the state with new observations
-            push!(bp_particles, s)
+    if up.m.mineral_exploration_mode == "borehole"
+        bp_geophysical_obs = deepcopy(b.geophysical_obs)
+        if a.type != :drill
+            bp_particles = MEState[] # MEState[p for p in b.particles]
+            for p in b.particles
+                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_bank_angle, p.geophysical_obs, p.timestep) # Update the state with new observations
+                push!(bp_particles, s)
+            end
+            bp_rock = RockObservations(ore_quals=deepcopy(b.rock_obs.ore_quals),
+                coordinates=deepcopy(b.rock_obs.coordinates))
+            # TODO Make this a little more general in future
+            if up.m.geodist_type == GeoStatsDistribution
+                bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, bp_rock, bp_geophysical_obs,
+                    b.geostats.domain, b.geostats.mean,
+                    b.geostats.variogram, b.geostats.lu_params)
+            elseif up.m.geodist_type == GSLIBDistribution
+                bp_geostats = GSLIBDistribution(b.geostats.grid_dims, b.geostats.grid_dims,
+                    bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
+                    b.geostats.variogram, b.geostats.target_histogram_file,
+                    b.geostats.columns_for_vr_and_wt, b.geostats.zmin_zmax,
+                    b.geostats.lower_tail_option, b.geostats.upper_tail_option,
+                    b.geostats.transform_data, b.geostats.mn,
+                    b.geostats.sz)
+            end
+        elseif a.type == :drill
+            bp_rock = deepcopy(b.rock_obs)
+            bp_rock.coordinates = hcat(bp_rock.coordinates, [a.coords[1], a.coords[2]])
+            push!(bp_rock.ore_quals, o.ore_quality)
+            if up.m.geodist_type == GeoStatsDistribution
+                bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock), b.geophysical_obs,
+                    b.geostats.domain, b.geostats.mean,
+                    b.geostats.variogram, b.geostats.lu_params)
+                update!(bp_geostats, bp_rock)
+            elseif up.m.geodist_type == GSLIBDistribution
+                bp_geostats = GSLIBDistribution(b.geostats.grid_dims, b.geostats.grid_dims,
+                    bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
+                    b.geostats.variogram, b.geostats.target_histogram_file,
+                    b.geostats.columns_for_vr_and_wt, b.geostats.zmin_zmax,
+                    b.geostats.lower_tail_option, b.geostats.upper_tail_option,
+                    b.geostats.transform_data, b.geostats.mn,
+                    b.geostats.sz)
+            end
+            f_update_particles = up.abc ? update_particles_abc : update_particles
+            bp_particles = f_update_particles(up, b.particles, bp_geostats, bp_rock, a, o)
         end
-        bp_rock = RockObservations(ore_quals=deepcopy(b.rock_obs.ore_quals),
-            coordinates=deepcopy(b.rock_obs.coordinates))
-        # TODO Make this a little more general in future
-        if up.m.geodist_type == GeoStatsDistribution
-            bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, bp_rock,
-                b.geostats.domain, b.geostats.mean,
-                b.geostats.variogram, b.geostats.lu_params)
-        elseif up.m.geodist_type == GSLIBDistribution
-            bp_geostats = GSLIBDistribution(b.geostats.grid_dims, b.geostats.grid_dims,
-                bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
-                b.geostats.variogram, b.geostats.target_histogram_file,
-                b.geostats.columns_for_vr_and_wt, b.geostats.zmin_zmax,
-                b.geostats.lower_tail_option, b.geostats.upper_tail_option,
-                b.geostats.transform_data, b.geostats.mn,
-                b.geostats.sz)
+    elseif up.m.mineral_exploration_mode == "geophysical"
+        bp_rock = deepcopy(b.rock_obs) # create dummy variable ahead of instantiation of MEBelief
+
+        if a.type == :fly
+            bp_geophysical_obs = append_geophysical_obs_sequence(deepcopy(b.geophysical_obs), o.geophysical_obs)
+
+            if up.m.geodist_type == GeoStatsDistribution
+                bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock), bp_geophysical_obs,
+                    b.geostats.domain, b.geostats.mean,
+                    b.geostats.variogram, b.geostats.lu_params)
+                update!(bp_geostats, bp_geophysical_obs)
+            else
+                error("GSLIBDistribution not implemented for fly action")
+            end
+            bp_particles = update_particles(up, b.particles, bp_geostats, bp_geophysical_obs, a, o)
+        else  # abandon, mine, stop
+            bp_particles = MEState[] # MEState[p for p in b.particles]
+            for p in b.particles
+                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_bank_angle, p.geophysical_obs, p.timestep) # Update the state with new observations
+                push!(bp_particles, s)
+            end
+            bp_geophysical_obs = deepcopy(b.geophysical_obs)
+            bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, bp_rock, bp_geophysical_obs, b.geostats.domain, b.geostats.mean, b.geostats.variogram, b.geostats.lu_params)
         end
-    else
-        bp_rock = deepcopy(b.rock_obs)
-        bp_rock.coordinates = hcat(bp_rock.coordinates, [a.coords[1], a.coords[2]])
-        push!(bp_rock.ore_quals, o.ore_quality)
-        if up.m.geodist_type == GeoStatsDistribution
-            bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock),
-                b.geostats.domain, b.geostats.mean,
-                b.geostats.variogram, b.geostats.lu_params)
-            update!(bp_geostats, bp_rock)
-        elseif up.m.geodist_type == GSLIBDistribution
-            bp_geostats = GSLIBDistribution(b.geostats.grid_dims, b.geostats.grid_dims,
-                bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
-                b.geostats.variogram, b.geostats.target_histogram_file,
-                b.geostats.columns_for_vr_and_wt, b.geostats.zmin_zmax,
-                b.geostats.lower_tail_option, b.geostats.upper_tail_option,
-                b.geostats.transform_data, b.geostats.mn,
-                b.geostats.sz)
-        end
-        f_update_particles = up.abc ? update_particles_abc : update_particles
-        bp_particles = f_update_particles(up, b.particles, bp_geostats, bp_rock, a, o)
     end
 
     bp_acts = MEAction[]
@@ -304,7 +331,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     bp_decided = o.decided
 
     return MEBelief(bp_particles, bp_rock, bp_acts, bp_obs, bp_stopped,
-        bp_decided, bp_geostats, up, b.timestep + 1)
+        bp_decided, bp_geostats, up, bp_geophysical_obs)
 end
 
 function Base.rand(rng::AbstractRNG, b::MEBelief)
@@ -391,11 +418,15 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
             return MEAction[MEAction(type=:stop)]
         end
 
-        # if not stopped and stop bound not satisfied, return 3 flying actions
+        # if not stopped and stop bound not satisfied, return 3 flying actions subject to bank angle (-45 deg, 45 deg) constraints
         acts = MEAction[]
-        push!(acts, MEAction(type=:fly, change_in_bank_angle=-5))
+        if !(b.bank_angle + m.bank_angle_intervals > m.max_bank_angle)
+            push!(acts, MEAction(type=:fly, change_in_bank_angle=m.bank_angle_intervals))
+        end
+        if !(b.bank_angle - m.bank_angle_intervals < -m.max_bank_angle)
+            push!(acts, MEAction(type=:fly, change_in_bank_angle=-m.bank_angle_intervals))
+        end
         push!(acts, MEAction(type=:fly, change_in_bank_angle=0))
-        push!(acts, MEAction(type=:fly, change_in_bank_angle=5))
         return collect(acts)
     end
     error("Invalid mineral exploration mode")

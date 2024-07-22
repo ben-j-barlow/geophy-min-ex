@@ -5,8 +5,10 @@ end
 
 @with_kw mutable struct GeophysicalObservations
     reading::Vector{Float64} = Vector{Float64}()
-    coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
+    smooth_map_coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
+    base_map_coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
 end
+
 
 struct MEState{MB}
     ore_map::Array{Float64}  # 3D array of ore_quality values for each grid-cell
@@ -17,9 +19,9 @@ struct MEState{MB}
     stopped::Bool # Whether or not STOP action has been taken
     decided::Bool # Whether or not the extraction decision has been made
     agent_heading::Float64
-    agent_pos_x::Vector{Float64}
+    # pos: will contain coordinates of agent at every timestep (which is only a subset of coordinates at which observations are made)
+    agent_pos_x::Vector{Float64}  
     agent_pos_y::Vector{Float64}
-    agent_velocity::Int
     agent_bank_angle::Int  # bank angle of agent
     geophysical_obs::GeophysicalObservations
     timestep::Int
@@ -33,13 +35,13 @@ struct MEObservation
     ore_quality::Union{Float64, Nothing}
     stopped::Bool
     decided::Bool
-    geophysical_reading::Union{Float64, Nothing}
+    geophysical_obs::Union{GeophysicalObservations, Nothing}
 end
 
 @with_kw struct MEAction
     type::Symbol = :drill
     coords::CartesianIndex = CartesianIndex(0, 0)
-    change_in_bank_angle::Int = 0 
+    change_in_bank_angle::Int = 0
 end
 
 abstract type GeoDist end
@@ -77,9 +79,9 @@ abstract type MainbodyGen end
     rng::AbstractRNG = Random.GLOBAL_RNG
     c_exp::Float64 = 1.0
 
-    grid_element_length::Int = 60  # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
+    base_grid_element_length::Int = 60  # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
     upscale_factor::Int = 10  # factor to upscale the grid by for smooth, higher resolution map
-    smooth_grid_element_length::Float64 = grid_element_length / upscale_factor
+    smooth_grid_element_length::Float64 = base_grid_element_length / upscale_factor
     sigma::Float64 = 10  # for smoothing map with gaussian filter
     geophysical_noise_std_dev::Float64 = 0.25
     max_timesteps::Int = 100
@@ -87,6 +89,15 @@ abstract type MainbodyGen end
     fly_cost::Float64 = 0.01
     massive_threshold::Float64 = 0.7
     strike_reward::Float64 = 1.0
+    init_bank_angle::Int = 0
+    init_pos_x::Int = convert(Float64, 0.0)
+    init_pos_y::Int = convert(Float64, 0.0)
+    init_heading::Int = convert(Float64, 45)
+    max_bank_angle::Int = 45
+    bank_angle_intervals::Int = 5
+    timestep_in_seconds::Int = 1
+    observations_per_timestep::Int = 1
+    velocity::Int = 20
 end
 
 struct MEInitStateDist  # prior over state space
@@ -105,4 +116,5 @@ struct MEInitStateDist  # prior over state space
     rng::AbstractRNG
     sigma::Float64  # for smoothing map with gaussian filter
     upscale_factor::Int
+    m::MineralExplorationPOMDP
 end

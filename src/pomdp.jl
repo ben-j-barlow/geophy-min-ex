@@ -93,7 +93,7 @@ function POMDPs.initialstate(m::MineralExplorationPOMDP)
     MEInitStateDist(true_gp_dist, gp_dist, m.mainbody_weight,
                     m.true_mainbody_gen, m.mainbody_gen,
                     m.massive_threshold, m.dim_scale, m.target_dim_scale,
-                    m.target_mass_params[1], m.target_mass_params[2], m.rng, m.sigma, m.upscale_factor) #m.rng passes global
+                    m.target_mass_params[1], m.target_mass_params[2], m.rng, m.sigma, m.upscale_factor, m) #m.rng passes global
 end
 
 function smooth_map_with_filter(map::Array{Float64}, sigma::Float64, upscale_factor::Int)
@@ -136,7 +136,19 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         end
         smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
 
-        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, 45.0, [0.0], [0.0], 20, 0, GeophysicalObservations(), 0)
+        @info "ore map $(typeof(ore_map))"
+        @info "smooth map $(typeof(smooth_map))"
+        @info "lode params $(typeof(lode_params))"
+        @info "lode map $(typeof(lode_map))"
+        @info "RockObservations() $(typeof(RockObservations()))"
+        @info "init head $(typeof(d.m.init_heading))"
+        @info "init pos x $(typeof(d.m.init_pos_x))"
+        @info "init pos y $(typeof(d.m.init_pos_y))"
+        @info "init bank angle $(typeof(d.m.init_bank_angle))"
+        @info "GeophysicalObservations() $(typeof(GeophysicalObservations()))"
+        @info "timestep $(typeof(0))"
+
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_x)], d.m.init_bank_angle, GeophysicalObservations(), 0)
         push!(states, state)
     end
     if n == 1
@@ -186,18 +198,6 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     decided = s.decided
     a_type = a.type
 
-    if a.type == :fly
-        new_bank_angle = s.agent_bank_angle + (a.change_in_bank_angle * DEG_TO_RAD)
-    else 
-        new_bank_angle = s.agent_bank_angle + (rand([-5, 5]) * DEG_TO_RAD)
-    end
-    new_bank_angle = clamp(new_bank_angle, -50 * DEG_TO_RAD, 50 * DEG_TO_RAD)
-    pos_x, pos_y, heading = update_agent_state(last(s.agent_pos_x), last(s.agent_pos_y), s.agent_heading, new_bank_angle, s.agent_velocity, m.smooth_grid_element_length)
-    
-    # plane at position (10.2, 12.7) in continuous scale should map to (11, 13) in discrete scale
-    pos_x_int = convert(Int, ceil(pos_x))
-    pos_y_int = convert(Int, ceil(pos_y))
-
     timestep = s.timestep + 1
     
     # drill then stop then mine or abandon
@@ -206,19 +206,23 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = false
-        geo_obs_p = deepcopy(s.geophysical_obs)
+        
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type == :abandon && stopped && !decided
+        heading_p = convert(Float64, 0)
         obs = MEObservation(nothing, true, true, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
-        geo_obs_p = deepcopy(s.geophysical_obs)
+        
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type == :mine && stopped && !decided
         obs = MEObservation(nothing, true, true, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
-        geo_obs_p = deepcopy(s.geophysical_obs)
+
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type ==:drill && !stopped && !decided
         ore_obs = high_fidelity_obs(m, s.ore_map, a)
         a_coords = reshape(Int64[a.coords[1] a.coords[2]], 2, 1)
@@ -228,26 +232,29 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         n_bores = length(rock_obs_p)
         stopped_p = n_bores >= m.max_bores
         decided_p = false
-        geo_obs_p = deepcopy(s.geophysical_obs)
         obs = MEObservation(ore_obs, stopped_p, decided_p, nothing)
-    elseif a_type == :fly
-        single_obs = geophysical_obs(s.smooth_map, pos_x_int, pos_y_int, m.geophysical_noise_std_dev)
 
-        geo_obs_p = deepcopy(s.geophysical_obs)
-        # append observation to 2x2 matrix of vectors
-        ore_map_x = pos_x_int / m.upscale_factor
-        ore_map_y = pos_y_int / m.upscale_factor
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
+    elseif a_type == :fly
+        # get new geophysical observation(s)
+        bank_angle_p = convert(Int64, s.agent_bank_angle + a.change_in_bank_angle)
+        current_geophysical_obs, pos_x, pos_y, heading_p = generate_geophysical_obs_sequence(m, s, a)
+    
+        # build MEObservation
         stopped_p = timestep >= m.max_timesteps
         decided_p = false
-        push!(geo_obs_p.reading, single_obs)
-        geo_obs_p.coordinates = hcat(geo_obs_p.coordinates, reshape(Int64[a.coords[1] a.coords[2]], 2, 1))
-        #TODO: implement stopped/decided code
-        obs = MEObservation(nothing, stopped_p, decided_p, single_obs)
+        obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs)
+
+        # prepare for MEState
+        geo_obs_p = append_geophysical_obs_sequence(deepcopy(s.geophysical_obs), current_geophysical_obs)
+        pos_x_p = push!(s.agent_pos_x, pos_x)
+        pos_y_p = push!(s.agent_pos_y, pos_y)
     else
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
+
     r = reward(m, s, a)
-    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading, push!(s.agent_pos_x, pos_x), push!(s.agent_pos_y, pos_y), s.agent_velocity, s.agent_bank_angle, geo_obs_p, timestep)
+    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, [pos_x_p], [pos_y_p], bank_angle_p, geo_obs_p, timestep)
     return (sp=sp, o=obs, r=r)
 end
 
@@ -281,7 +288,6 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
     end
     return r
 end
-
 
 
 function POMDPs.actions(m::MineralExplorationPOMDP)
@@ -393,7 +399,7 @@ function high_fidelity_obs(m::MineralExplorationPOMDP, subsurface_map::Array, a:
     end
 end
 
-function geophysical_obs(x::Int, y::Int, smooth_map::Array{Float64}, std_dev::Float64)
+function geophysical_obs(x::Int64, y::Int64, smooth_map::Array{Float64}, std_dev::Float64)
     # geophysical equivalent of high_fidelity_obs
     # add noise to the observation
 
@@ -403,8 +409,7 @@ function geophysical_obs(x::Int, y::Int, smooth_map::Array{Float64}, std_dev::Fl
     return smooth_map[x, y, 1] + rand(Normal(0, std_dev), 1)[1]
 end
 
-
-function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, v::Int, normalizing_factor::Float64, dt::Int = 1, g::Float64 = 9.81)
+function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, v::Int, dt::Int = 1, g::Float64 = 9.81)
     # psi - current heading
     # phi - current bank angle, in radians
     # v - current velocity (remains constant)
@@ -412,12 +417,49 @@ function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, 
 
     # get change in heading, x and y
     psi_dot = g * tan(phi) / v
-    x_dot = v * cos(psi) / normalizing_factor
-    y_dot = v * sin(psi) / normalizing_factor
+    x_dot = v * cos(psi)
+    y_dot = v * sin(psi)
 
     # update heading, x and y
     psi += psi_dot * dt
     x += x_dot * dt
     y += y_dot * dt
     return x, y, psi
+end
+
+
+function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEState, a::MEAction, bank_angle::Int)
+    # get sequence of positions in meters, convert to smooth grid coordinates and observe geophysical data
+    # return in GeophysicalObservations format
+
+    pos_x, pos_y, heading = last(s.agent_pos_x), last(s.agent_pos_y), s.agent_heading  # position in meters
+
+    dt = m.timestep_in_seconds / m.observations_per_timestep
+
+    tmp_go = GeophysicalObservations()
+
+    for _ in 1:m.observations_per_timestep
+        pos_x, pos_y, heading = update_agent_state(pos_x, pos_y, heading, bank_angle * DEG_TO_RAD, m.velocity, dt)  # position in meters
+        
+        # convert position in meters to coordinates
+        x_smooth_map = convert(Int64, ceil(x / m.smooth_grid_element_length))  # use ceil() because plane at position (10.2, 12.7) in continuous scale should map to (11, 13) in discrete scale
+        y_smooth_map = convert(Int64, ceil(y / m.smooth_grid_element_length))
+        x_base_map = convert(Int64, ceil(x / m.base_grid_element_length))
+        y_base_map = convert(Int64, ceil(y / m.base_grid_element_length))
+    
+        # generate observation
+        obs = geophysical_obs(x, y, s.smooth_map, m.geophysical_noise_std_dev)
+        tmp_go.reading = push!(tmp_go.reading, obs)
+        tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[x_smooth_map y_smooth_map], 2, 1))
+        tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[x_base_map y_base_map], 2, 1))
+    end
+
+    return tmp_go, pos_x, pos_y, heading
+end
+
+function append_geophysical_obs_sequence(history::GeophysicalObservations, new_obs::GeophysicalObservations)
+    history.reading = vcat(history.reading, new_obs.reading)
+    history.base_map_coordinates = hcat(history.base_map_coordinates, new_obs.base_map_coordinates)
+    history.smooth_map_coordinates = hcat(history.smooth_map_coordinates, new_obs.smooth_map_coordinates)
+    return history
 end
