@@ -109,6 +109,7 @@ end
 POMCPOW.updater(p::ExpertPolicy) = MEBeliefUpdater(p.m, 1)
 
 function POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.BeliefNode)
+    error("This function hasn't been implemented for geophysical version")
     @info "POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.BeliefNode)"
     srb = node.tree.sr_beliefs[node.node]
     cv = srb.dist
