@@ -120,7 +120,6 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     abs_errs = Float64[ae]
     rel_errs = Float64[re]
     vol_stds = Float64[std_vols]
-    dists = Float64[]
     final_belief = nothing
     trees = []
     if verbose
@@ -133,7 +132,6 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=m.max_bores+2, rng=m.rng)
         @info "\n\n timestep $t"
         discounted_return += POMDPs.discount(m)^(t - 1)*r
-        dist = sqrt(sum(([a.coords[1], a.coords[2]] .- 25.0).^2)) #TODO only for single fixed
         last_action = a.type
 
         b_fig = plot(bp, t; cmap=cmap)
@@ -142,7 +140,6 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         if verbose
             @show t
             @show a.type
-            @show a.coords
             println("Vols: $mean_vols ± $std_vols")
         end
 
@@ -150,7 +147,6 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             n_drills += 1
             ae = mean(abs.(vols .- r_massive))
             re = mean(vols .- r_massive)
-            push!(dists, dist)
             push!(abs_errs, ae)
             push!(rel_errs, re)
             push!(vol_stds, std_vols)
@@ -209,9 +205,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         end
     end
     ts = [1:length(abs_errs);] .- 1
-    dist_fig = plot(ts[2:end], dists, title="bore distance to center",
-                    xlabel="time step", ylabel="distance", legend=:none, lw=2, c=:crimson)
-
+    
     abs_err_fig = plot(ts, abs_errs, title="absolute volume error",
                     xlabel="time step", ylabel="absolute error", legend=:none, lw=2, c=:crimson)
 
@@ -222,9 +216,6 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     vols_fig = plot(ts, vol_stds./vol_stds[1], title="volume standard deviation",
                     xlabel="time step", ylabel="standard deviation", legend=:none, lw=2, c=:crimson)
     if isa(save_dir, String)
-        path = string(save_dir, "dists.png")
-        savefig(dist_fig, path)
-
         path = string(save_dir, "abs_err.png")
         savefig(abs_err_fig, path)
 
@@ -235,7 +226,6 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         savefig(vols_fig, path)
     end
     if display_figs
-        display(dist_fig)
         display(abs_err_fig)
         display(rel_err_fig)
         display(vols_fig)
@@ -243,7 +233,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     
     @info "decision $last_action"
     @info "n drills $n_drills"
-    return_values = (discounted_return, dists, abs_errs, rel_errs, vol_stds, n_drills, r_massive, last_action)
+    return_values = (discounted_return, abs_errs, rel_errs, vol_stds, n_drills, r_massive, last_action)
     if return_final_belief
         return_values = (return_values..., final_belief)
     end
