@@ -24,7 +24,6 @@ struct MEState{MB}
     agent_pos_y::Vector{Float64}
     agent_bank_angle::Int  # bank angle of agent
     geophysical_obs::GeophysicalObservations
-    timestep::Int
 end
 
 function Base.length(obs::RockObservations)
@@ -36,6 +35,10 @@ struct MEObservation
     stopped::Bool
     decided::Bool
     geophysical_obs::Union{GeophysicalObservations, Nothing}
+    agent_heading::Union{Float64, Nothing}
+    agent_pos_x::Union{Float64, Nothing}
+    agent_pos_y::Union{Float64, Nothing}
+    agent_bank_angle::Union{Int64, Nothing}
 end
 
 @with_kw struct MEAction
@@ -92,7 +95,7 @@ abstract type MainbodyGen end
     init_bank_angle::Int = 0
     init_pos_x::Int = convert(Float64, 0.0)
     init_pos_y::Int = convert(Float64, 0.0)
-    init_heading::Int = convert(Float64, 45)
+    init_heading::Float64 = convert(Float64, 45)
     max_bank_angle::Int = 45
     bank_angle_intervals::Int = 5
     timestep_in_seconds::Int = 1

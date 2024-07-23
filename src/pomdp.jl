@@ -148,7 +148,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         @info "GeophysicalObservations() $(typeof(GeophysicalObservations()))"
         @info "timestep $(typeof(0))"
 
-        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_x)], d.m.init_bank_angle, GeophysicalObservations(), 0)
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_x)], d.m.init_bank_angle, GeophysicalObservations())
         push!(states, state)
     end
     if n == 1
@@ -197,12 +197,10 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     stopped = s.stopped
     decided = s.decided
     a_type = a.type
-
-    timestep = s.timestep + 1
     
     # drill then stop then mine or abandon
     if a_type == :stop && !stopped && !decided
-        obs = MEObservation(nothing, true, false, nothing)
+        obs = MEObservation(nothing, true, false, nothing, nothing, nothing, nothing, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = false
@@ -210,14 +208,14 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type == :abandon && stopped && !decided
         heading_p = convert(Float64, 0)
-        obs = MEObservation(nothing, true, true, nothing)
+        obs = MEObservation(nothing, true, true, nothing, nothing, nothing, nothing, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
         
         pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type == :mine && stopped && !decided
-        obs = MEObservation(nothing, true, true, nothing)
+        obs = MEObservation(nothing, true, true, nothing, nothing, nothing, nothing, nothing)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
@@ -232,7 +230,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         n_bores = length(rock_obs_p)
         stopped_p = n_bores >= m.max_bores
         decided_p = false
-        obs = MEObservation(ore_obs, stopped_p, decided_p, nothing)
+        obs = MEObservation(ore_obs, stopped_p, decided_p, nothing, nothing, nothing, nothing, nothing)
 
         pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type == :fly
@@ -243,7 +241,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         # build MEObservation
         stopped_p = timestep >= m.max_timesteps
         decided_p = false
-        obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs)
+        obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, bank_angle_p)
 
         # prepare for MEState
         geo_obs_p = append_geophysical_obs_sequence(deepcopy(s.geophysical_obs), current_geophysical_obs)
@@ -254,7 +252,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     end
 
     r = reward(m, s, a)
-    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, [pos_x_p], [pos_y_p], bank_angle_p, geo_obs_p, timestep)
+    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, [pos_x_p], [pos_y_p], bank_angle_p, geo_obs_p)
     return (sp=sp, o=obs, r=r)
 end
 
@@ -376,11 +374,18 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
         if a.type != :fly # mine, abdndon and stop all lead to o.geophysical_reading == nothing evaluating to true
             w = o.geophysical_reading == nothing ? 1.0 : 0.0
         else
-            o_mainbody = high_fidelity_obs(m, s.mainbody_map, a)  # mainbody value at drill location
-
-            o_gp = (o.geophysical_reading - o_mainbody)  # difference between observation and mainbody value
-            point_dist = Normal(m.gp_mean, sqrt(m.variogramp[1]))  # dist
-            w = pdf(point_dist, o_gp)  # weight
+            # for #observations
+            # get mainbody value at drill location
+            n_obs = length(o.geophysical_obs.reading)
+            o_n = zeros(Float64, n_obs)
+            for i in 1:length(n_obs)
+                dummy_drill_action = MEAction(coords=CartesianIndex(o.geophysical_obs.base_map_coordinates[1, i], o.geophysical_obs.base_map_coordinates[2, i]))
+                o_mainbody = high_fidelity_obs(m, s.mainbody_map, dummy_drill_action)
+                o_n[i] = (o.geophysical_obs.reading[i] - o_mainbody)  # difference between observation and mainbody value
+            end
+        
+            point_dist = Normal(m.gp_mean, sqrt(m.variogram[1]))  # dist
+            w = pdf(gp_dist, o_n)
         end
     else 
         error("Invalid Mineral Exploration Mode: $(m.mineral_exploration_mode)")
