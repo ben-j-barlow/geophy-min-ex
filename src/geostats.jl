@@ -192,7 +192,7 @@ function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, n::Int64=1)
     return solve_gp(problem, d, n)
 end
 
-function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, dummy_geo_obs::GeophysicalObservations(), n::Int64=1)
+function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, dummy_geo_obs::GeophysicalObservations, n::Int64=1)
     # use multiple dispatch to run different code based on geophysical data
     # 
     table = DataFrame(ore=d.geophysical_data.reading .- d.mean)
