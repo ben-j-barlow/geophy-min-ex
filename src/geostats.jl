@@ -181,6 +181,21 @@ function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, n::Int64=1)
         geodata = georef(table, domain)
         problem = SimulationProblem(geodata, d.domain, (:ore), n)
     end
+    return solve_gp(problem, d, n)
+end
+
+function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, dummy_geo_obs::GeophysicalObservations(), n::Int64=1)
+    # use multiple dispatch to run different code based on geophysical data
+    # 
+    table = DataFrame(ore=d.geophysical_data.reading .- d.mean)
+    domain = PointSet(d.geophysical_data.base_map_coordinates)
+    geodata = georef(table, domain)
+    problem = SimulationProblem(geodata, d.domain, (:ore), n)
+    return solve_gp(problem, d, n)
+end
+
+#, solver::LUGS, preproc::Dict; procs=[GeoStats.GeoStatsBase.myid()]
+function solve_gp(problem::SimulationProblem, d::GeoStatsDistribution, n::Int64)
     conames = (:ore,)
     d₂, z₁ = calc_covs(d, problem)
     μ = 0.0
@@ -200,6 +215,8 @@ function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, n::Int64=1)
         return ore_maps
     end
 end
+
+
 
 Base.rand(d::GeoStatsDistribution, n::Int64=1) = Base.rand(Random.GLOBAL_RNG, d, n)
 

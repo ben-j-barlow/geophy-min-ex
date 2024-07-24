@@ -109,28 +109,58 @@ function calc_K(geostats::GeoDist, geophysical_obs::GeophysicalObservations)
     return K
 end
 
+
 function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)
     @info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)"
-    ws = Float64[] # Initialize weights array
-    bore_coords = rock_obs.coordinates # Get borehole coordinates
-    n = size(bore_coords)[2] # Number of boreholes
-    ore_obs = [o for o in rock_obs.ore_quals] # List of ore quality observations
-    K = calc_K(geostats, rock_obs) # Calculate the covariance matrix using geostats and rock observations
-    mu = zeros(Float64, n) .+ up.m.gp_mean # Mean vector filled with the Gaussian process mean
-    gp_dist = MvNormal(mu, K) # Multivariate normal distribution based on mean vector and covariance matrix
+    ws = Float64[]
+    bore_coords = rock_obs.coordinates
+    n = size(bore_coords)[2]
+    ore_obs = [o for o in rock_obs.ore_quals]
+    K = calc_K(geostats, rock_obs)
+    mu = zeros(Float64, n) .+ up.m.gp_mean
+    gp_dist = MvNormal(mu, K)
     for s in particles
-        mb_map = s.mainbody_map # Get the main body map from the state
-        o_n = zeros(Float64, n) # Initialize the array for normalized ore observations
+        mb_map = s.mainbody_map
+        o_n = zeros(Float64, n)
         for i = 1:n
-            o_mainbody = mb_map[bore_coords[1, i], bore_coords[2, i]] # Main body ore quality at the borehole location
-            o_n[i] = ore_obs[i] - o_mainbody # Normalize the ore observation
+            o_mainbody = mb_map[bore_coords[1, i], bore_coords[2, i]]
+            o_n[i] = ore_obs[i] - o_mainbody
         end
-        w = pdf(gp_dist, o_n) # Calculate the weight as the probability density of the normalized observations
-        push!(ws, w) # Add the weight to the weights array
+        w = pdf(gp_dist, o_n)
+        push!(ws, w)
     end
-    ws .+= 1e-6 # Add a small value to weights to avoid zero values
-    ws ./= sum(ws) # Normalize the weights
-    return ws # Return the weights
+    ws .+= 1e-6
+    ws ./= sum(ws)
+    return ws
+end
+
+
+function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geophysical_obs::GeophysicalObservations)
+    @info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geophysical_obs::GeophysicalObservations)"
+    ws = Float64[]
+    coords = geophysical_obs.base_map_coordinates
+    n = size(coords)[2]
+    if n == 0
+        error("no geophysical observations")
+    end
+
+    ore_obs = [o for o in geophysical_obs.reading]
+    K = calc_K(geostats, geophysical_obs)
+    mu = zeros(Float64, n) .+ up.m.gp_mean
+    gp_dist = MvNormal(mu, K)
+    for p in particles
+        mb_map = p.mainbody_map
+        o_n = zeros(Float64, n)
+        for i = 1:n
+            o_mainbody = mb_map[coords[1, i], coords[2, i]]
+            o_n[i] = ore_obs[i] - o_mainbody
+        end
+        w = pdf(gp_dist, o_n)
+        push!(ws, w)
+    end
+    ws .+= 1e-6
+    ws ./= sum(ws)
+    return ws
 end
 
 
@@ -172,7 +202,7 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
 
         smooth_map = smooth_map_with_filter(ore_map, up.sigma, up.upscale_factor)
         sp = MEState(ore_map, smooth_map, mainbody_param, mainbody_map, rock_obs_p, # Create a new state with the updated ore map, parameters, and observations
-            o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_bank_angle, s.geophysical_obs, s.timestep)
+            o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_bank_angle, s.geophysical_obs)
         push!(mainbody_params, mainbody_param) # Add the main body parameters to the array
         push!(particles, sp) # Add the new state to the particles array
     end
@@ -180,11 +210,68 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
 end
 
 
+
+function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
+    geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation;
+    apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
+    @info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation)"
+    sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true) # Resample particles based on weights
+    mainbody_params = []
+    particles = MEState[]
+
+    dummy_geo_obs = GeophysicalObservations()
+    for s in sampled_particles
+        gp_map = s.smooth_map - s.mainbody_map  # gp represents noise linking the mainbody map to smooth map
+
+        # perform perturbation
+        mainbody_param = s.mainbody_params
+        if apply_perturbation
+            if mainbody_param ∈ mainbody_params
+                mainbody_map, mainbody_param = perturb_sample(up.m.mainbody_gen, mainbody_param, up.noise)
+                max_lode = maximum(mainbody_map)
+                mainbody_map ./= max_lode
+                mainbody_map .*= up.m.mainbody_weight
+                mainbody_map = reshape(mainbody_map, up.m.grid_dim)
+                # clamp!(ore_map, 0.0, 1.0) 
+            end
+        end
+
+        # initialize ahead of normalization
+        n_normalized_reading = Float64[]
+        readings = deepcopy(geo_obs.reading)
+
+        for (i, value) in enumerate(readings)
+            prior_ore = mainbody_map[geo_obs.base_map_coordinates[1, i], geo_obs.base_map_coordinates[2, i], 1]
+            to_append = (value - prior_ore)
+            push!(n_normalized_reading, to_append)
+        end
+
+        geostats.geophysical_data.reading = n_normalized_reading  # update geostats to contain the normalized readings
+
+        if resample_background_noise
+            gp_ore_map = Base.rand(up.rng, geostats, dummy_geo_obs)
+        end
+        ore_map = gp_ore_map .+ mainbody_map
+
+        geo_obs_p = GeophysicalObservations(geo_obs.reading, geo_obs.smooth_map_coordinates, geo_obs.base_map_coordinates)
+
+        smooth_map = smooth_map_with_filter(ore_map, up.sigma, up.upscale_factor)
+
+        sp = MEState(ore_map, smooth_map, mainbody_param, mainbody_map, geo_obs_p,
+            o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_bank_angle, s.geophysical_obs)
+        push!(mainbody_params, mainbody_param)
+        push!(particles, sp)
+    end
+    return particles # Return the resampled particles
+end
+
+
+
 function update_particles(up::MEBeliefUpdater, particles::Vector{MEState},
-    geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
+    geostats::GeoDist, obs::Union{GeophysicalObservations,RockObservations}, a::MEAction, o::MEObservation)
     @info "update_particles"
-    wp = reweight(up, geostats, particles, rock_obs)
-    pp = resample(up, particles, wp, geostats, rock_obs, a, o)
+    wp = reweight(up, geostats, particles, obs)
+    pp = resample(up, particles, wp, geostats, obs, a, o)
     return pp
 end
 
@@ -249,7 +336,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
         if a.type != :drill
             bp_particles = MEState[] # MEState[p for p in b.particles]
             for p in b.particles
-                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_bank_angle, p.geophysical_obs, p.timestep) # Update the state with new observations
+                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_bank_angle, p.geophysical_obs) # Update the state with new observations
                 push!(bp_particles, s)
             end
             bp_rock = RockObservations(ore_quals=deepcopy(b.rock_obs.ore_quals),
@@ -307,7 +394,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
         else  # abandon, mine, stop
             bp_particles = MEState[] # MEState[p for p in b.particles]
             for p in b.particles
-                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_bank_angle, p.geophysical_obs, p.timestep) # Update the state with new observations
+                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_bank_angle, p.geophysical_obs) # Update the state with new observations
                 push!(bp_particles, s)
             end
             bp_geophysical_obs = deepcopy(b.geophysical_obs)
@@ -507,6 +594,11 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
         end
         return MEAction[]
     elseif m.mineral_exploration_mode == "geophysical"
+        o = b.sr_belief.o
+        s = rand(m.rng, b.sr_belief.dist)[1]
+
+        @info "s heading $(s.agent_heading)"
+
         if o.stopped
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
         end

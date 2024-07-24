@@ -44,15 +44,22 @@ end
 
 function sample_initial(p::MineralExplorationPOMDP, n::Integer)
     @info "sample_initial(p::MineralExplorationPOMDP, n::Integer)"
-    coords, coords_array = sample_coords(p.grid_dim, n)
-    dist = GeoStatsDistribution(p)
-    state = rand(p.rng, dist)
-    ore_quality = state[coords]
-    return RockObservations(ore_quality, coords_array)
+    if p.mineral_exploration_mode == "borehole"
+        coords, coords_array = sample_coords(p.grid_dim, n)
+        dist = GeoStatsDistribution(p)
+        state = rand(p.rng, dist)
+        ore_quality = state[coords]
+        return RockObservations(ore_quality, coords_array)
+    elseif p.mineral_exploration_mode == "geophysical"
+        error("Geophysical mode not implemented yet")
+    else
+        error("Invalid Mineral Exploration Mode: $(p.mineral_exploration_mode)")
+    end
 end
 
 function sample_initial(p::MineralExplorationPOMDP, coords::Array)
     @info "sample_initial(p::MineralExplorationPOMDP, coords::Array)"
+    error("not considered geophysical case, see function defined above")
     n = length(coords)
     coords_array = Array{Int64}(undef, 2, n)
     for (i, sample) in enumerate(coords)
@@ -377,9 +384,12 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
             # for #observations
             # get mainbody value at drill location
             n_obs = length(o.geophysical_obs.reading)
+            if n_obs == 0
+                error("No observations")
+            end
             o_n = zeros(Float64, n_obs)
             for i in 1:length(n_obs)
-                dummy_drill_action = MEAction(coords=CartesianIndex(o.geophysical_obs.base_map_coordinates[1, i], o.geophysical_obs.base_map_coordinates[2, i]))
+                dummy_drill_action = MEAction(type=:drill, coords=CartesianIndex(o.geophysical_obs.base_map_coordinates[1, i], o.geophysical_obs.base_map_coordinates[2, i]))
                 o_mainbody = high_fidelity_obs(m, s.mainbody_map, dummy_drill_action)
                 o_n[i] = (o.geophysical_obs.reading[i] - o_mainbody)  # difference between observation and mainbody value
             end
@@ -387,7 +397,7 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
             point_dist = Normal(m.gp_mean, sqrt(m.variogram[1]))  # dist
             w = pdf(gp_dist, o_n)
         end
-    else 
+    else
         error("Invalid Mineral Exploration Mode: $(m.mineral_exploration_mode)")
     end
     return w
