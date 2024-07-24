@@ -207,27 +207,27 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     
     # drill then stop then mine or abandon
     if a_type == :stop && !stopped && !decided
-        obs = MEObservation(nothing, true, false, nothing, nothing, nothing, nothing, nothing)
+        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), s.agent_bank_angle)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = false
         
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = [convert(Float64, 0)], [convert(Float64, 0)], convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type == :abandon && stopped && !decided
         heading_p = convert(Float64, 0)
-        obs = MEObservation(nothing, true, true, nothing, nothing, nothing, nothing, nothing)
+        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), s.agent_bank_angle)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
         
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = [convert(Float64, 0)], [convert(Float64, 0)], convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type == :mine && stopped && !decided
-        obs = MEObservation(nothing, true, true, nothing, nothing, nothing, nothing, nothing)
+        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), s.agent_bank_angle)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
 
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = [convert(Float64, 0)], [convert(Float64, 0)], convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
     elseif a_type ==:drill && !stopped && !decided
         ore_obs = high_fidelity_obs(m, s.ore_map, a)
         a_coords = reshape(Int64[a.coords[1] a.coords[2]], 2, 1)
@@ -239,14 +239,14 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         decided_p = false
         obs = MEObservation(ore_obs, stopped_p, decided_p, nothing, nothing, nothing, nothing, nothing)
 
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = convert(Float64, 0), convert(Float64, 0), convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = [convert(Float64, 0)], [convert(Float64, 0)], convert(Float64, 0), convert(Int64, 0), s.geophysical_obs
     elseif a_type == :fly
         # get new geophysical observation(s)
         bank_angle_p = convert(Int64, s.agent_bank_angle + a.change_in_bank_angle)
         current_geophysical_obs, pos_x, pos_y, heading_p = generate_geophysical_obs_sequence(m, s, a)
     
         # build MEObservation
-        stopped_p = timestep >= m.max_timesteps
+        stopped_p = false 
         decided_p = false
         obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, bank_angle_p)
 
@@ -259,7 +259,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     end
 
     r = reward(m, s, a)
-    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, [pos_x_p], [pos_y_p], bank_angle_p, geo_obs_p)
+    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, pos_x_p, pos_y_p, bank_angle_p, geo_obs_p)
     return (sp=sp, o=obs, r=r)
 end
 
@@ -282,6 +282,11 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
         end
     elseif m.mineral_exploration_mode == "geophysical"
         if a_type == :fly
+            if check_plane_within_region(m, last(s.agent_pos_x), last(s.agent_pos_y), m.out_of_bounds_tolerance)
+                r = -m.fly_cost
+            else
+                r = - (m.fly_cost + m.out_of_bounds_cost)
+            end
             r = -m.fly_cost
         elseif a_type == :mine
             r = extraction_reward(m, s)
@@ -378,15 +383,9 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
             w = pdf(point_dist, o_gp)  # weight
         end
     elseif m.mineral_exploration_mode == "geophysical"
-        if a.type != :fly # mine, abdndon and stop all lead to o.geophysical_reading == nothing evaluating to true
-            w = o.geophysical_reading == nothing ? 1.0 : 0.0
-        else
+        if a.type == :fly && (!is_empty(o.geophysical_obs)) # flying outside of the map region (& mine, abdndon, stop) all lead to o.geophysical_reading == nothing evaluating to true
             # for #observations
             # get mainbody value at drill location
-            n_obs = length(o.geophysical_obs.reading)
-            if n_obs == 0
-                error("No observations")
-            end
             o_n = zeros(Float64, n_obs)
             for i in 1:length(n_obs)
                 dummy_drill_action = MEAction(type=:drill, coords=CartesianIndex(o.geophysical_obs.base_map_coordinates[1, i], o.geophysical_obs.base_map_coordinates[2, i]))
@@ -396,6 +395,14 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
         
             point_dist = Normal(m.gp_mean, sqrt(m.variogram[1]))  # dist
             w = pdf(gp_dist, o_n)
+        else  
+            if o.geophysical_obs == nothing # mine, abandon, stop lead to == nothing
+                w = 1.0
+            elseif is_empty(o.geophysical_obs) # flying outside of region leads to empty GeophysicalObservations
+                w = 1.0
+            else
+                error("o.geophysical_reading unexpectedly not nothing")
+            end
         end
     else
         error("Invalid Mineral Exploration Mode: $(m.mineral_exploration_mode)")
@@ -421,7 +428,13 @@ function geophysical_obs(x::Int64, y::Int64, smooth_map::Array{Float64}, std_dev
     # ideas
     # use continuous coordinates to generate weighted average of 4 map points
     # let bank angle influence noise
-    return smooth_map[x, y, 1] + rand(Normal(0, std_dev), 1)[1]
+    if x > size(smooth_map)[1]
+        error("x coordinate out of bounds")
+    elseif y > size(smooth_map)[2]
+        error("y coordinate out of bounds")
+    else
+        return smooth_map[x, y, 1] + rand(Normal(0, std_dev), 1)[1]
+    end
 end
 
 function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, v::Int, dt::Int = 1, g::Float64 = 9.81)
@@ -456,17 +469,20 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
     for _ in 1:m.observations_per_timestep
         pos_x, pos_y, heading = update_agent_state(pos_x, pos_y, heading, bank_angle * DEG_TO_RAD, m.velocity, dt)  # position in meters
         
-        # convert position in meters to coordinates
-        x_smooth_map = convert(Int64, ceil(x / m.smooth_grid_element_length))  # use ceil() because plane at position (10.2, 12.7) in continuous scale should map to (11, 13) in discrete scale
-        y_smooth_map = convert(Int64, ceil(y / m.smooth_grid_element_length))
-        x_base_map = convert(Int64, ceil(x / m.base_grid_element_length))
-        y_base_map = convert(Int64, ceil(y / m.base_grid_element_length))
-    
-        # generate observation
-        obs = geophysical_obs(x, y, s.smooth_map, m.geophysical_noise_std_dev)
-        tmp_go.reading = push!(tmp_go.reading, obs)
-        tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[x_smooth_map y_smooth_map], 2, 1))
-        tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[x_base_map y_base_map], 2, 1))
+        # convert position in meters to coordinates (including check for map boundaries)
+        
+        if check_plane_within_region(m, pos_x, pos_y)
+            x_smooth_map = convert(Int64, ceil(x / m.smooth_grid_element_length))  # use ceil() because plane at position (10.2, 12.7) in continuous scale should map to (11, 13) in discrete scale
+            y_smooth_map = convert(Int64, ceil(y / m.smooth_grid_element_length))
+            x_base_map = convert(Int64, ceil(x / m.base_grid_element_length))
+            y_base_map = convert(Int64, ceil(y / m.base_grid_element_length))
+        
+            # generate observation
+            obs = geophysical_obs(x, y, s.smooth_map, m.geophysical_noise_std_dev)
+            tmp_go.reading = push!(tmp_go.reading, obs)
+            tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[x_smooth_map y_smooth_map], 2, 1))
+            tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[x_base_map y_base_map], 2, 1))
+        end
     end
 
     return tmp_go, pos_x, pos_y, heading
@@ -477,4 +493,17 @@ function append_geophysical_obs_sequence(history::GeophysicalObservations, new_o
     history.base_map_coordinates = hcat(history.base_map_coordinates, new_obs.base_map_coordinates)
     history.smooth_map_coordinates = hcat(history.smooth_map_coordinates, new_obs.smooth_map_coordinates)
     return history
+end
+
+function check_plane_within_region(m::MineralExplorationPOMDP, pos_x::Float64, pos_y::Float64, tolerance::Int=0)
+    # tolerance - number of grid squares that the plane can be outside the region
+    max = (m.grid_dim[1] + tolerance) * m.base_grid_element_length
+    min = (0 - tolerance) * m.base_grid_element_length
+    pos_x_on_map = min < pos_x <= max
+    pos_y_on_map = -min < pos_y <= max
+    return pos_x_on_map && pos_y_on_map
+end
+
+function is_empty(obs::GeophysicalObservations)
+    return length(obs.reading) == 0
 end

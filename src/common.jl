@@ -90,6 +90,8 @@ abstract type MainbodyGen end
     max_timesteps::Int = 100
     mineral_exploration_mode = "borehole" # borehole or geophysical
     fly_cost::Float64 = 0.01
+    out_of_bounds_cost::Float64 = 0.1  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
+    out_of_bounds_tolerance::Int = 1 # number of grid base map grid squares the agent can be out of bounds before incurring cost
     massive_threshold::Float64 = 0.7
     strike_reward::Float64 = 1.0
     init_bank_angle::Int = 0

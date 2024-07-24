@@ -379,7 +379,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     elseif up.m.mineral_exploration_mode == "geophysical"
         bp_rock = deepcopy(b.rock_obs) # create dummy variable ahead of instantiation of MEBelief
 
-        if a.type == :fly
+        if a.type == :fly && !is_empty(o.geophysical_obs)
             bp_geophysical_obs = append_geophysical_obs_sequence(deepcopy(b.geophysical_obs), o.geophysical_obs)
 
             if up.m.geodist_type == GeoStatsDistribution
@@ -391,12 +391,15 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
                 error("GSLIBDistribution not implemented for fly action")
             end
             bp_particles = update_particles(up, b.particles, bp_geostats, bp_geophysical_obs, a, o)
-        else  # abandon, mine, stop
+            
+        else # mine, abandon, stop, or (fly & is_empty(o.geophysical_obs))
             bp_particles = MEState[] # MEState[p for p in b.particles]
             for p in b.particles
-                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, p.agent_heading, p.agent_pos_x, p.agent_pos_y, p.agent_bank_angle, p.geophysical_obs) # Update the state with new observations
+                # behaviour built into o::MEObservation: plane dynamics are same as in the previous timestep for a in {mine, abandon, or stop}
+                # behaviour built into o::MEObservation: plane dynamics update if (a = fly) & (is_empty(o.geophysical_obs))
+                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, o.agent_heading, o.agent_pos_x, o.agent_pos_y, o.agent_bank_angle, p.geophysical_obs) # Update the state with new observations
                 push!(bp_particles, s)
-            end
+            end    
             bp_geophysical_obs = deepcopy(b.geophysical_obs)
             bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, bp_rock, bp_geophysical_obs, b.geostats.domain, b.geostats.mean, b.geostats.variogram, b.geostats.lu_params)
         end
