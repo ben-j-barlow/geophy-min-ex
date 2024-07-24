@@ -550,8 +550,6 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
         s = rand(m.rng, b.sr_belief.dist)[1]
         @info "s type $(typeof(s))" # s type MEState{Vector{Any}}
 
-        @info "s agent pos x $(s.agent_pos_x)"
-
         if o.stopped
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
         else
@@ -602,7 +600,6 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
         o = b.sr_belief.o
         s = rand(m.rng, b.sr_belief.dist)[1]
 
-        @info "s heading $(s.agent_heading)"
 
         if o.stopped
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
