@@ -239,7 +239,12 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         decided_p = false
         obs = MEObservation(ore_obs, stopped_p, decided_p, nothing, nothing, nothing, nothing, nothing)
 
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
+        tmp_pos_x = deepcopy(s.agent_pos_x)
+        # add 5
+        tmp_pos_x[end] += 5
+        @info "added 5, pos_x now $(tmp_pos_x), size is $(size(tmp_pos_x))"
+
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = tmp_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type == :fly
         # get new geophysical observation(s)
         bank_angle_p = convert(Int64, s.agent_bank_angle + a.change_in_bank_angle)
