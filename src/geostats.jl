@@ -41,14 +41,21 @@ end
 
 
 
-
-function update!(d::GeoStatsDistribution, o::RockObservations)
-    @info "update!(d::GeoStatsDistribution, o::RockObservations)"
-    d.data.ore_quals = o.ore_quals
-    d.data.coordinates = o.coordinates
-
-    table = DataFrame(ore=d.data.ore_quals .- d.mean)
-    domain = PointSet(d.data.coordinates)
+function update!(d::GeoStatsDistribution, o::Union{RockObservations, GeophysicalObservations})
+    if isa(o, RockObservations)
+        @info "update!(d::GeoStatsDistribution, o::RockObservations)"
+        d.data.ore_quals = o.ore_quals
+        d.data.coordinates = o.coordinates
+        table = DataFrame(ore=d.data.ore_quals .- d.mean)
+        domain = PointSet(d.data.coordinates)
+    elseif isa(o, GeophysicalObservations)
+        @info "update!(d::GeoStatsDistribution, o::GeophysicalObservations)"
+        d.geophysical_data.reading = o.reading
+        d.geophysical_data.base_map_coordinates = o.base_map_coordinates
+        table = DataFrame(ore=d.geophysical_data.reading .- d.mean)
+        domain = PointSet(d.geophysical_data.base_map_coordinates)
+    end
+    
     pdata = georef(table, domain)
     pdomain = d.domain
 
@@ -79,6 +86,7 @@ function update!(d::GeoStatsDistribution, o::RockObservations)
     d.lu_params.L₁₁ = L₁₁
     d.lu_params.L₂₂ = L₂₂
 end
+
 
 function calc_covs(d::GeoStatsDistribution, problem)
     @info "calc_covs(d::GeoStatsDistribution, problem)"
