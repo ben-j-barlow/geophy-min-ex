@@ -212,7 +212,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         stopped_p = true
         decided_p = false
         
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = [convert(Float64, 0)], [convert(Float64, 0)], convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type == :abandon && stopped && !decided
         heading_p = convert(Float64, 0)
         obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), s.agent_bank_angle)
@@ -220,14 +220,14 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         stopped_p = true
         decided_p = true
         
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = [convert(Float64, 0)], [convert(Float64, 0)], convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type == :mine && stopped && !decided
         obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), s.agent_bank_angle)
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
 
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = [convert(Float64, 0)], [convert(Float64, 0)], convert(Float64, 0), convert(Int64, 0), deepcopy(s.geophysical_obs)
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type ==:drill && !stopped && !decided
         ore_obs = high_fidelity_obs(m, s.ore_map, a)
         a_coords = reshape(Int64[a.coords[1] a.coords[2]], 2, 1)
@@ -239,7 +239,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         decided_p = false
         obs = MEObservation(ore_obs, stopped_p, decided_p, nothing, nothing, nothing, nothing, nothing)
 
-        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = [convert(Float64, 0)], [convert(Float64, 0)], convert(Float64, 0), convert(Int64, 0), s.geophysical_obs
+        pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type == :fly
         # get new geophysical observation(s)
         bank_angle_p = convert(Int64, s.agent_bank_angle + a.change_in_bank_angle)
