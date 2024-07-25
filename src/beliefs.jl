@@ -27,6 +27,7 @@ struct MEBelief{G}
     geostats::G #GSLIB or GeoStats
     up::MEBeliefUpdater ## include the belief updater
     geophysical_obs::GeophysicalObservations
+    bank_angle::Int
 end
 
 # Ensure MEBeliefs can be compared when adding them to dictionaries (using `hash`, `isequal` and `==`)
@@ -50,7 +51,7 @@ function POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)
     rock_obs = RockObservations(init_rocks.ore_quals, init_rocks.coordinates)
     acts = MEAction[]
     obs = MEObservation[]
-    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, GeophysicalObservations())
+    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, GeophysicalObservations(), up.m.init_bank_angle)
 end
 
 # TODO: ParticleFilters.particles
@@ -225,6 +226,7 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
 
         # perform perturbation
         mainbody_param = s.mainbody_params
+        mainbody_map = s.mainbody_map
         if apply_perturbation
             if mainbody_param ∈ mainbody_params
                 mainbody_map, mainbody_param = perturb_sample(up.m.mainbody_gen, mainbody_param, up.noise)
@@ -421,7 +423,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     bp_decided = o.decided
 
     return MEBelief(bp_particles, bp_rock, bp_acts, bp_obs, bp_stopped,
-        bp_decided, bp_geostats, up, bp_geophysical_obs)
+        bp_decided, bp_geostats, up, bp_geophysical_obs, o.agent_bank_angle)
 end
 
 function Base.rand(rng::AbstractRNG, b::MEBelief)
@@ -509,15 +511,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
         end
 
         # if not stopped and stop bound not satisfied, return 3 flying actions subject to bank angle (-45 deg, 45 deg) constraints
-        acts = MEAction[]
-        if !(b.bank_angle + m.bank_angle_intervals > m.max_bank_angle)
-            push!(acts, MEAction(type=:fly, change_in_bank_angle=m.bank_angle_intervals))
-        end
-        if !(b.bank_angle - m.bank_angle_intervals < -m.max_bank_angle)
-            push!(acts, MEAction(type=:fly, change_in_bank_angle=-m.bank_angle_intervals))
-        end
-        push!(acts, MEAction(type=:fly, change_in_bank_angle=0))
-        return collect(acts)
+        return collect(get_flying_actions(m, b.agent_bank_angle))
     end
     error("Invalid mineral exploration mode")
 end
@@ -599,12 +593,27 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
     elseif m.mineral_exploration_mode == "geophysical"
         o = b.sr_belief.o
         s = rand(m.rng, b.sr_belief.dist)[1]
-
-
         if o.stopped
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
+        else
+            # add stop and flying actions to the belief tree
+            to_return = get_flying_actions(m, s.agent_bank_angle)
+            push!(to_return, MEAction(type=:stop))
+            return collect(to_return)
         end
     end
+end
+
+function get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)
+    acts = MEAction[]
+    if !(current_bank_angle + m.bank_angle_intervals > m.max_bank_angle)
+        push!(acts, MEAction(type=:fly, change_in_bank_angle=m.bank_angle_intervals))
+    end
+    if !(current_bank_angle - m.bank_angle_intervals < -m.max_bank_angle)
+        push!(acts, MEAction(type=:fly, change_in_bank_angle=-m.bank_angle_intervals))
+    end
+    push!(acts, MEAction(type=:fly, change_in_bank_angle=0))
+    return acts
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)

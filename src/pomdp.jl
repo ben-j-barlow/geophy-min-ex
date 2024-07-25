@@ -237,7 +237,8 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         n_bores = length(rock_obs_p)
         stopped_p = n_bores >= m.max_bores
         decided_p = false
-        obs = MEObservation(ore_obs, stopped_p, decided_p, nothing, nothing, nothing, nothing, nothing)
+        # include meaningless bank angle since non-nothing bank angle needed for MEBelief construction
+        obs = MEObservation(ore_obs, stopped_p, decided_p, nothing, nothing, nothing, nothing, s.agent_bank_angle)
 
         pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type == :fly

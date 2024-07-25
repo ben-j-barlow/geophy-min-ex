@@ -109,7 +109,7 @@ end
 POMCPOW.updater(p::ExpertPolicy) = MEBeliefUpdater(p.m, 1)
 
 function POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.BeliefNode)
-    error("This function hasn't been implemented for geophysical version")
+    error("This function hasn't been implemented for geophysical version, returns 0 for bank angle")
     @info "POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.BeliefNode)"
     srb = node.tree.sr_beliefs[node.node]
     cv = srb.dist
@@ -135,7 +135,7 @@ function POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.Bel
         push!(acts, a)
         push!(obs, o)
     end
-    return MEBelief(coords, stopped, particles, acts, obs, p)
+    return MEBelief(coords, stopped, particles, acts, obs, p, 0)
 end
 
 function POMDPs.action(p::ExpertPolicy, b::MEBelief)
