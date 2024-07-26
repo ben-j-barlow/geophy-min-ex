@@ -8,11 +8,23 @@ function GeoStatsDistribution(p::MineralExplorationPOMDP; truth=false)
     #domain = CartesianGrid(convert(Float64, grid_dims[1]), convert(Float64, grid_dims[2]))
     domain = CartesianGrid(grid_dims[1], grid_dims[2])
     #return GeoStatsDistribution(rng=p.rng,
-    return GeoStatsDistribution(grid_dims=grid_dims,
-                                data=deepcopy(p.initial_data),
-                                domain=domain,
-                                mean=p.gp_mean,
-                                variogram=variogram)
+    if p.mineral_exploration_mode == "borehole"
+        return GeoStatsDistribution(grid_dims=grid_dims,
+                                    data=deepcopy(p.initial_data),
+                                    geophysical_data=GeophysicalObservations(),
+                                    domain=domain,
+                                    mean=p.gp_mean,
+                                    variogram=variogram)
+    elseif p.mineral_exploration_mode == "geophysical"
+        return GeoStatsDistribution(grid_dims=grid_dims,
+                                    data=RockObservations(),
+                                    geophysical_data=deepcopy(p.initial_geophysical_data),
+                                    domain=domain,
+                                    mean=p.gp_mean,
+                                    variogram=variogram)
+    else
+        error("Invalid Mineral Exploration Mode: $(p.mineral_exploration_mode)")
+    end
 end
 
 function GSLIBDistribution(p::MineralExplorationPOMDP)
@@ -74,7 +86,9 @@ end
 
 function initialize_data!(p::MineralExplorationPOMDP, n::Integer)
     @info "initialize_data!(p::MineralExplorationPOMDP, n::Integer)"
-
+    if p.mineral_exploration_mode == "geophysical" 
+        error("Geophysical mode not implemented yet")
+    end
     new_rock_obs = sample_initial(p, n)
     append!(p.initial_data.ore_quals, new_rock_obs.ore_quals)
     p.initial_data.coordinates = hcat(p.initial_data.coordinates, new_rock_obs.coordinates)
@@ -142,18 +156,6 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
             ore_map, lode_params = scale_sample(d, mainbody_gen, lode_map, gp_ore_map, lode_params; target_μ=d.target_μ, target_σ=d.target_σ)
         end
         smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
-
-        @info "ore map $(typeof(ore_map))"
-        @info "smooth map $(typeof(smooth_map))"
-        @info "lode params $(typeof(lode_params))"
-        @info "lode map $(typeof(lode_map))"
-        @info "RockObservations() $(typeof(RockObservations()))"
-        @info "init head $(typeof(d.m.init_heading))"
-        @info "init pos x $(typeof(d.m.init_pos_x))"
-        @info "init pos y $(typeof(d.m.init_pos_y))"
-        @info "init bank angle $(typeof(d.m.init_bank_angle))"
-        @info "GeophysicalObservations() $(typeof(GeophysicalObservations()))"
-        @info "timestep $(typeof(0))"
 
         state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_x)], d.m.init_bank_angle, GeophysicalObservations())
         push!(states, state)
@@ -303,6 +305,9 @@ end
 
 function POMDPs.actions(m::MineralExplorationPOMDP)
     @info "POMDPs.actions(m::MineralExplorationPOMDP)"
+    if m.mineral_exploration_mode == "geophysical"
+        error("Geophysical mode not implemented yet")
+    end
     idxs = CartesianIndices(m.grid_dim[1:2])
     bore_actions = reshape(collect(idxs), prod(m.grid_dim[1:2]))
     actions = MEAction[MEAction(type=:stop), MEAction(type=:mine),

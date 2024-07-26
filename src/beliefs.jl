@@ -47,11 +47,16 @@ Base.:(==)(b1::MEBelief, b2::MEBelief) = isequal(b1, b2)
 function POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)
     @info "POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)"
     particles = rand(up.rng, d, up.n)
-    init_rocks = up.m.initial_data
-    rock_obs = RockObservations(init_rocks.ore_quals, init_rocks.coordinates)
+    if up.m.mineral_exploration_mode == "borehole"
+        rock_obs = RockObservations(up.m.initial_data.ore_quals, up.m.initial_data.coordinates)
+        geophysical_obs = GeophysicalObservations()
+    else
+        rock_obs = RockObservations()
+        geophysical_obs = GeophysicalObservations(up.m.initial_geophysical_data.reading, up.m.initial_geophysical_data.smooth_map_coordinates, up.m.initial_geophysical_data.base_map_coordinates)
+    end
     acts = MEAction[]
     obs = MEObservation[]
-    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, GeophysicalObservations(), up.m.init_bank_angle)
+    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, geophysical_obs, up.m.init_bank_angle)
 end
 
 # TODO: ParticleFilters.particles

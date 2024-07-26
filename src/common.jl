@@ -65,6 +65,7 @@ abstract type MainbodyGen end
     original_max_movement::Int64 = 0 # Original maximum distanace between bores in the default 50x50 grid. 0 denotes no restrictions
     max_movement::Int64 = round(Int, original_max_movement*ratio[1]) # Maximum distanace between bores (scaled based on the ratio). 0 denotes no restrictions
     initial_data::RockObservations = RockObservations() # Initial rock observations
+    initial_geophysical_data::GeophysicalObservations = GeophysicalObservations() # Initial geophysical observations
     delta::Int64 = 1 # Minimum distance between wells (grid coordinates)
     grid_spacing::Int64 = 0 # Number of cells in between each cell in which wells can be placed
     drill_cost::Float64 = 0.1
