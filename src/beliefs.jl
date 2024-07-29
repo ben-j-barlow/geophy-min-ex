@@ -27,7 +27,7 @@ struct MEBelief{G}
     geostats::G #GSLIB or GeoStats
     up::MEBeliefUpdater ## include the belief updater
     geophysical_obs::GeophysicalObservations
-    bank_angle::Int
+    agent_bank_angle::Int
 end
 
 # Ensure MEBeliefs can be compared when adding them to dictionaries (using `hash`, `isequal` and `==`)
@@ -144,14 +144,21 @@ end
 function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geophysical_obs::GeophysicalObservations)
     @info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geophysical_obs::GeophysicalObservations)"
     ws = Float64[]
-    coords = geophysical_obs.base_map_coordinates
+    
+    # dedupe observations from same square
+    geo_obs_dedupe = aggregate_base_map_duplicates(geophysical_obs)
+    coords = geo_obs_dedupe.base_map_coordinates
+
     n = size(coords)[2]
     if n == 0
         error("no geophysical observations")
     end
 
-    ore_obs = [o for o in geophysical_obs.reading]
-    K = calc_K(geostats, geophysical_obs)
+    ore_obs = [o for o in geo_obs_dedupe.reading]
+    K = calc_K(geostats, geo_obs_dedupe)
+    @info "coordinates $(coords)"
+    @info "K: $(size(K))"
+    @info "K $K"
     mu = zeros(Float64, n) .+ up.m.gp_mean
     gp_dist = MvNormal(mu, K)
     for p in particles
@@ -219,15 +226,16 @@ end
 
 function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation;
-    apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
+    apply_perturbation=true, resample_background_noise::Bool=false, n=up.n)
     @info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation)"
     sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true) # Resample particles based on weights
     mainbody_params = []
     particles = MEState[]
 
-    dummy_geo_obs = GeophysicalObservations()
+    dummy_geo_obs = GeophysicalObservations() # used to force multiple dispatch to the correct method
+
     for s in sampled_particles
-        gp_map = s.smooth_map - s.mainbody_map  # gp represents noise linking the mainbody map to smooth map
+        gp_map = s.ore_map - s.mainbody_map  # gp represents noise linking the mainbody map to smooth map
 
         # perform perturbation
         mainbody_param = s.mainbody_params
@@ -243,18 +251,22 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
             end
         end
 
+        # take average in case of multiple readings at the same location
+        geo_obs = aggregate_base_map_duplicates(geo_obs)
+
         # initialize ahead of normalization
         n_normalized_reading = Float64[]
         readings = deepcopy(geo_obs.reading)
 
+        # normalize readings using mainbody value
         for (i, value) in enumerate(readings)
             prior_ore = mainbody_map[geo_obs.base_map_coordinates[1, i], geo_obs.base_map_coordinates[2, i], 1]
             to_append = (value - prior_ore)
             push!(n_normalized_reading, to_append)
         end
-
         geostats.geophysical_data.reading = n_normalized_reading  # update geostats to contain the normalized readings
 
+        gp_ore_map = s.ore_map - s.mainbody_map
         if resample_background_noise
             gp_ore_map = Base.rand(up.rng, geostats, dummy_geo_obs)
         end
@@ -264,8 +276,8 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
 
         smooth_map = smooth_map_with_filter(ore_map, up.sigma, up.upscale_factor)
 
-        sp = MEState(ore_map, smooth_map, mainbody_param, mainbody_map, geo_obs_p,
-            o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_bank_angle, s.geophysical_obs)
+        sp = MEState(ore_map, smooth_map, mainbody_param, mainbody_map, s.rock_obs,
+            o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_bank_angle, geo_obs_p)
         push!(mainbody_params, mainbody_param)
         push!(particles, sp)
     end
@@ -457,7 +469,6 @@ end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
     @info "POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)"
-    @info "$(b.timestep)"
     if m.mineral_exploration_mode == "borehole"
         if b.stopped
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
@@ -511,10 +522,11 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
         end
 
         # if not stopped but stop bound satisfied, return stop
-        if calculate_stop_bound(m, b)
+        tmp = false
+        if tmp # calculate_stop_bound(m, b)
             return MEAction[MEAction(type=:stop)]
         end
-
+        
         # if not stopped and stop bound not satisfied, return 3 flying actions subject to bank angle (-45 deg, 45 deg) constraints
         return collect(get_flying_actions(m, b.agent_bank_angle))
     end
@@ -525,14 +537,29 @@ function calculate_stop_bound(m::MineralExplorationPOMDP, b::MEBelief)
     @info "calculate_stop_bound()"
     volumes = Float64[]
     for p in b.particles
-        v = calc_massive(pomdp, p)
+        v = calc_massive(m, p)
         push!(volumes, v)
     end
     mean_volume = Statistics.mean(volumes)
     volume_std = Statistics.std(volumes)
+    @info "mean_volume $(mean_volume)"
+    @info "volume_std $(volume_std)"
+
     lcb = mean_volume - volume_std*m.extraction_lcb
     ucb = mean_volume + volume_std*m.extraction_ucb
-    return lcb >= m.extraction_cost || ucb <= m.extraction_cost
+
+    @info "lcb is $(lcb) = $(mean_volume - volume_std*m.extraction_lcb) >= $(m.extraction_cost) which is extraction cost"
+    @info "ucb is $(ucb) = $(mean_volume + volume_std*m.extraction_lcb) <= $(m.extraction_cost) which is extraction cost"
+
+    cond1 = lcb >= m.extraction_cost
+    cond2 = ucb <= m.extraction_cost
+    
+    @info "cond1 $(cond1)"
+    @info "cond2 $(cond2)"
+    
+    to_return =  cond1 || cond2
+    @info "calculate stop bound returning $(to_return)"
+    return to_return
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
@@ -610,13 +637,17 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
 end
 
 function get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)
+    @info "get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)"
     acts = MEAction[]
     if !(current_bank_angle + m.bank_angle_intervals > m.max_bank_angle)
+        @info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle + m.bank_angle_intervals)"
         push!(acts, MEAction(type=:fly, change_in_bank_angle=m.bank_angle_intervals))
     end
     if !(current_bank_angle - m.bank_angle_intervals < -m.max_bank_angle)
+        @info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle - m.bank_angle_intervals)"
         push!(acts, MEAction(type=:fly, change_in_bank_angle=-m.bank_angle_intervals))
     end
+    @info "adding action with bank angle 0"
     push!(acts, MEAction(type=:fly, change_in_bank_angle=0))
     return acts
 end

@@ -5,8 +5,26 @@ end
 
 @with_kw mutable struct GeophysicalObservations
     reading::Vector{Float64} = Vector{Float64}()
-    smooth_map_coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
+    smooth_map_coordinates::Union{Matrix{Int64}, Nothing} = zeros(Int64, 2, 0)
     base_map_coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
+end
+
+function aggregate_base_map_duplicates(obs::GeophysicalObservations)
+    # Convert base_map_coordinates to a DataFrame for easier manipulation
+    df = DataFrame(x=obs.base_map_coordinates[1, :], y=obs.base_map_coordinates[2, :], reading=obs.reading)
+
+    # Group by coordinates and calculate the mean reading for each group
+    grouped_df = combine(groupby(df, [:x, :y]), :reading => mean => :average_reading)
+
+    # Create new GeophysicalObservations object with reduced duplicates
+    new_reading = grouped_df.average_reading
+    new_base_map_coordinates = hcat(grouped_df.x, grouped_df.y)
+
+    return GeophysicalObservations(
+        reading=new_reading,
+        smooth_map_coordinates=nothing,
+        base_map_coordinates=new_base_map_coordinates
+    )
 end
 
 
@@ -69,9 +87,6 @@ abstract type MainbodyGen end
     delta::Int64 = 1 # Minimum distance between wells (grid coordinates)
     grid_spacing::Int64 = 0 # Number of cells in between each cell in which wells can be placed
     drill_cost::Float64 = 0.1
-    extraction_cost::Float64 = 150.0
-    extraction_lcb::Float64 = 0.1
-    extraction_ucb::Float64 = 0.1
     variogram::Tuple = (0.005, 30.0, 0.0001) #sill, range, nugget
     # nugget::Tuple = (1, 0)
     geodist_type::Type = GeoStatsDistribution # GeoDist type for geo noise
@@ -79,7 +94,6 @@ abstract type MainbodyGen end
     mainbody_weight::Float64 = 0.6  
     true_mainbody_gen::MainbodyGen = BlobNode(grid_dims=high_fidelity_dim) # high-fidelity true mainbody generator
     mainbody_gen::MainbodyGen = BlobNode(grid_dims=grid_dim)
-    target_mass_params::Tuple{Real, Real} = (extraction_cost, extraction_cost/3) # target mean and std when standardizing ore mass distributions
     rng::AbstractRNG = Random.GLOBAL_RNG
     c_exp::Float64 = 1.0
 
@@ -89,7 +103,7 @@ abstract type MainbodyGen end
     sigma::Float64 = 10  # for smoothing map with gaussian filter
     geophysical_noise_std_dev::Float64 = 0.25
     max_timesteps::Int = 100
-    mineral_exploration_mode = "borehole" # borehole or geophysical
+    mineral_exploration_mode = "geophysical" # borehole or geophysical
     fly_cost::Float64 = 0.01
     out_of_bounds_cost::Float64 = 0.1  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
     out_of_bounds_tolerance::Int = 1 # number of grid base map grid squares the agent can be out of bounds before incurring cost
@@ -104,6 +118,10 @@ abstract type MainbodyGen end
     timestep_in_seconds::Int = 1
     observations_per_timestep::Int = 1
     velocity::Int = 20
+    extraction_cost::Float64 = 150.0
+    extraction_lcb::Float64 = 0.5
+    extraction_ucb::Float64 = 0.5
+    target_mass_params::Tuple{Real, Real} = (extraction_cost, extraction_cost/3) # target mean and std when standardizing ore mass distributions
 end
 
 struct MEInitStateDist  # prior over state space

@@ -41,7 +41,8 @@ export
         MEInitStateDist,
         MEBelief,
         MainbodyGen,
-        GeophysicalObservations
+        GeophysicalObservations,
+        aggregate_base_map_duplicates
 include("common.jl")
 
 export
@@ -105,6 +106,7 @@ include("standardization.jl")
 export
         plot_history,
         run_trial,
+        run_geophysical_trial,
         gen_cases,
         plot_ore_map,
         plot_mass_map,

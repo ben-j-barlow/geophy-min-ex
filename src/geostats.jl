@@ -194,6 +194,7 @@ end
 
 function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, dummy_geo_obs::GeophysicalObservations, n::Int64=1)
     # use multiple dispatch to run different code based on geophysical data
+    @info "Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, dummy_geo_obs::GeophysicalObservations, n::Int64=1)"
     table = DataFrame(ore=d.geophysical_data.reading .- d.mean)
     domain = PointSet(d.geophysical_data.base_map_coordinates)
     geodata = georef(table, domain)
