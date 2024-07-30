@@ -9,23 +9,43 @@ end
     base_map_coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
 end
 
+
 function aggregate_base_map_duplicates(obs::GeophysicalObservations)
-    # Convert base_map_coordinates to a DataFrame for easier manipulation
-    df = DataFrame(x=obs.base_map_coordinates[1, :], y=obs.base_map_coordinates[2, :], reading=obs.reading)
-
-    # Group by coordinates and calculate the mean reading for each group
-    grouped_df = combine(groupby(df, [:x, :y]), :reading => mean => :average_reading)
-
-    # Create new GeophysicalObservations object with reduced duplicates
-    new_reading = grouped_df.average_reading
-    new_base_map_coordinates = hcat(grouped_df.x, grouped_df.y)
-
+    # Create a dictionary to store the sums and counts of readings for each coordinate
+    coord_sum = Dict{Tuple{Int64, Int64}, Float64}()
+    coord_count = Dict{Tuple{Int64, Int64}, Int64}()
+    
+    # Iterate over the coordinates and readings to populate the dictionaries
+    for i in 1:length(obs.reading)
+        coord = (obs.base_map_coordinates[1, i], obs.base_map_coordinates[2, i])
+        if haskey(coord_sum, coord)
+            coord_sum[coord] += obs.reading[i]
+            coord_count[coord] += 1
+        else
+            coord_sum[coord] = obs.reading[i]
+            coord_count[coord] = 1
+        end
+    end
+    
+    # Create new vectors for the deduplicated coordinates and their average readings
+    new_coords = zeros(Int64, 2, length(coord_sum))
+    new_readings = Vector{Float64}(undef, length(coord_sum))
+    
+    idx = 1
+    for (coord, sum_reading) in coord_sum
+        new_coords[1, idx] = coord[1]
+        new_coords[2, idx] = coord[2]
+        new_readings[idx] = sum_reading / coord_count[coord]
+        idx += 1
+    end
+    
     return GeophysicalObservations(
-        reading=new_reading,
+        reading=new_readings,
         smooth_map_coordinates=nothing,
-        base_map_coordinates=new_base_map_coordinates
+        base_map_coordinates=new_coords
     )
 end
+
 
 
 struct MEState{MB}
@@ -117,7 +137,7 @@ abstract type MainbodyGen end
     bank_angle_intervals::Int = 5
     timestep_in_seconds::Int = 1
     observations_per_timestep::Int = 1
-    velocity::Int = 20
+    velocity::Int = 70
     extraction_cost::Float64 = 150.0
     extraction_lcb::Float64 = 0.5
     extraction_ucb::Float64 = 0.5

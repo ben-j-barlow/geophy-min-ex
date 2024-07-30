@@ -549,6 +549,14 @@ function get_smooth_map_coordinates(x::Float64, y::Float64, m::MineralExploratio
 end
 
 function append_geophysical_obs_sequence(history::GeophysicalObservations, new_obs::GeophysicalObservations)
+    @info "history $(history.base_map_coordinates)"
+    @info "history $(history.smooth_map_coordinates)"
+    @info "history $(history.reading)"
+    @info ""
+    @info "new_obs $(new_obs.base_map_coordinates)"
+    @info "new_obs $(new_obs.smooth_map_coordinates)"
+    @info "new_obs $(new_obs.reading)"
+
     history.reading = vcat(history.reading, new_obs.reading)
     history.base_map_coordinates = hcat(history.base_map_coordinates, new_obs.base_map_coordinates)
     history.smooth_map_coordinates = hcat(history.smooth_map_coordinates, new_obs.smooth_map_coordinates)

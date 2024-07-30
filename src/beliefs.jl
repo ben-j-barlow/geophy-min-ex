@@ -146,7 +146,7 @@ function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geo
     ws = Float64[]
     
     # dedupe observations from same square
-    geo_obs_dedupe = aggregate_base_map_duplicates(geophysical_obs)
+    geo_obs_dedupe = aggregate_base_map_duplicates(deepcopy(geophysical_obs))
     coords = geo_obs_dedupe.base_map_coordinates
 
     n = size(coords)[2]
@@ -226,7 +226,7 @@ end
 
 function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation;
-    apply_perturbation=true, resample_background_noise::Bool=false, n=up.n)
+    apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
     @info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation)"
     sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true) # Resample particles based on weights
     mainbody_params = []
@@ -252,19 +252,20 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
         end
 
         # take average in case of multiple readings at the same location
-        geo_obs = aggregate_base_map_duplicates(geo_obs)
+        geo_obs_dedupe = aggregate_base_map_duplicates(geo_obs)
 
         # initialize ahead of normalization
         n_normalized_reading = Float64[]
-        readings = deepcopy(geo_obs.reading)
+        readings = deepcopy(geo_obs_dedupe.reading)
 
         # normalize readings using mainbody value
         for (i, value) in enumerate(readings)
-            prior_ore = mainbody_map[geo_obs.base_map_coordinates[1, i], geo_obs.base_map_coordinates[2, i], 1]
+            prior_ore = mainbody_map[geo_obs_dedupe.base_map_coordinates[1, i], geo_obs_dedupe.base_map_coordinates[2, i], 1]
             to_append = (value - prior_ore)
             push!(n_normalized_reading, to_append)
         end
         geostats.geophysical_data.reading = n_normalized_reading  # update geostats to contain the normalized readings
+        geostats.geophysical_data.base_map_coordinates = geo_obs_dedupe.base_map_coordinates  # update geostats to contain the deduped coordinates
 
         gp_ore_map = s.ore_map - s.mainbody_map
         if resample_background_noise
@@ -400,12 +401,13 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
 
         if a.type == :fly && !is_empty(o.geophysical_obs)
             bp_geophysical_obs = append_geophysical_obs_sequence(deepcopy(b.geophysical_obs), o.geophysical_obs)
+            bp_dedupe_geophysical_obs = aggregate_base_map_duplicates(deepcopy(bp_geophysical_obs))
 
             if up.m.geodist_type == GeoStatsDistribution
-                bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock), bp_geophysical_obs,
+                bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock), bp_dedupe_geophysical_obs,
                     b.geostats.domain, b.geostats.mean,
                     b.geostats.variogram, b.geostats.lu_params)
-                update!(bp_geostats, bp_geophysical_obs)
+                update!(bp_geostats, bp_dedupe_geophysical_obs)
             else
                 error("GSLIBDistribution not implemented for fly action")
             end
@@ -647,7 +649,7 @@ function get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)
         @info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle - m.bank_angle_intervals)"
         push!(acts, MEAction(type=:fly, change_in_bank_angle=-m.bank_angle_intervals))
     end
-    @info "adding action with bank angle 0"
+    @info "adding action with bank angle $(current_bank_angle)"
     push!(acts, MEAction(type=:fly, change_in_bank_angle=0))
     return acts
 end
