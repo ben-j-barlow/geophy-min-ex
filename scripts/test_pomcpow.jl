@@ -24,7 +24,7 @@ ds0 = POMDPs.initialstate(m)
 
 g = GeoStatsDistribution(m)
 
-up = MEBeliefUpdater(m, g, 1000, 2.0)
+up = MEBeliefUpdater(m, 1000, 2.0)
 println("Initializing belief...")
 b0 = POMDPs.initialize_belief(up, ds0)
 println("Belief Initialized!")
@@ -57,6 +57,7 @@ A = Symbol[]
 ME = Vector{Float64}[]
 STD = Vector{Float64}[]
 println("Starting simulations")
+
 for i in 1:N
     if (i%1) == 0
         println("Trial $i")

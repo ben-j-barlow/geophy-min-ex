@@ -21,9 +21,11 @@ GRID_SPACING = 0
 MAX_MOVEMENT = 20
 
 C_EXP = 2
-SAVE_DIR = "./data/demos/multishape_sandbox/4-19_$C_EXP" #instead of +string(variable) OR $(var1+var2)
+SAVE_DIR = "./data/sandbox/w3_$C_EXP" #instead of +string(variable) OR $(var1+var2)
 
 !isdir(SAVE_DIR) && mkdir(SAVE_DIR)
+
+io = MineralExploration.prepare_logger()
 
 grid_dims = (50, 50, 1)
 true_mainbody = BlobNode(grid_dims=grid_dims, factor=4)
@@ -36,6 +38,7 @@ m = MineralExplorationPOMDP(max_bores=MAX_BORES, delta=GRID_SPACING+1, grid_spac
 initialize_data!(m, N_INITIAL)
 @show m.max_movement
 
+
 ds0 = POMDPs.initialstate(m)
 
 s0 = rand(ds0; truth=true) #Checked
@@ -43,26 +46,29 @@ s0 = rand(ds0; truth=true) #Checked
 up = MEBeliefUpdater(m, 1000, 2.0) #Checked
 b0 = POMDPs.initialize_belief(up, ds0) #Checked
 
+
+
 next_action = NextActionSampler()
-tree_queries = [5, 1_000, 10_000]
-i_tree_queries = 1
+tree_queries = [3, 5, 10, 100, 1_000, 10_000]
+i_tree_queries = 5
 
 usepomcpow = true
 if usepomcpow == true
     solver = POMCPOWSolver(tree_queries=tree_queries[i_tree_queries],
                         check_repeat_obs=true,
                         check_repeat_act=true,
-                        next_action=next_action,
-                        k_action=2.0,
-                        alpha_action=0.25,
+                        enable_action_pw=m.mineral_exploration_mode == "borehole" ? true : false,
+                        next_action=m.mineral_exploration_mode == "borehole" ? next_action : nothing,
+                        k_action=m.mineral_exploration_mode == "borehole" ? 2.0 : nothing,
+                        alpha_action=m.mineral_exploration_mode == "borehole" ? 0.25 : nothing,
                         k_observation=2.0,
                         alpha_observation=0.1,
                         criterion=POMCPOW.MaxUCB(100.0),
                         final_criterion=POMCPOW.MaxQ(),
                         # final_criterion=POMCPOW.MaxTries(),
-                        estimate_value=0.0,
-                        max_depth=1,
-                        # estimate_value=leaf_estimation,
+                        max_depth=5,
+                        estimate_value=leaf_estimation, # or 0.0
+                        tree_in_info=true,
                         )
     planner = POMDPs.solve(solver, m)
 else
@@ -70,5 +76,8 @@ else
     planner = RandomPolicy(m, updater = up)
 end
 
-timing = @timed results = run_trial(m, up, planner, s0, b0, save_dir=SAVE_DIR, display_figs=false)
+timing = @timed run_trial(m, up, planner, s0, b0, save_dir=SAVE_DIR, display_figs=false, return_all_trees=true, verbose=false)
+
+MineralExploration.close_logger(io)
+
 @show timing.time
