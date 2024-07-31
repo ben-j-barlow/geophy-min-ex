@@ -6,23 +6,22 @@ end
 @with_kw mutable struct GeophysicalObservations
     reading::Vector{Float64} = Vector{Float64}()
     smooth_map_coordinates::Union{Matrix{Int64}, Nothing} = zeros(Int64, 2, 0)
-    base_map_coordinates::Matrix{Int64} = zeros(Int64, 2, 0)
+    base_map_coordinates::Union{Matrix{Int64}, Nothing} = zeros(Int64, 2, 0)
 end
 
 
-function aggregate_base_map_duplicates(obs::GeophysicalObservations)
-    # Create a dictionary to store the sums and counts of readings for each coordinate
+function aggregate_coordinates(reading::Vector{Float64}, coordinates::Matrix{Int64})
     coord_sum = Dict{Tuple{Int64, Int64}, Float64}()
     coord_count = Dict{Tuple{Int64, Int64}, Int64}()
     
     # Iterate over the coordinates and readings to populate the dictionaries
-    for i in 1:length(obs.reading)
-        coord = (obs.base_map_coordinates[1, i], obs.base_map_coordinates[2, i])
+    for i in 1:length(reading)
+        coord = (coordinates[1, i], coordinates[2, i])
         if haskey(coord_sum, coord)
-            coord_sum[coord] += obs.reading[i]
+            coord_sum[coord] += reading[i]
             coord_count[coord] += 1
         else
-            coord_sum[coord] = obs.reading[i]
+            coord_sum[coord] = reading[i]
             coord_count[coord] = 1
         end
     end
@@ -39,13 +38,30 @@ function aggregate_base_map_duplicates(obs::GeophysicalObservations)
         idx += 1
     end
     
+    return new_readings, new_coords
+end
+
+function aggregate_base_map_duplicates(obs::GeophysicalObservations)
+    # Create a dictionary to store the sums and counts of readings for each coordinate
+    readings, coords = aggregate_coordinates(obs.reading, obs.base_map_coordinates)
+    
     return GeophysicalObservations(
-        reading=new_readings,
+        reading=readings,
         smooth_map_coordinates=nothing,
-        base_map_coordinates=new_coords
+        base_map_coordinates=coords
     )
 end
 
+function aggregate_smooth_map_duplicates(obs::GeophysicalObservations)
+    # Create a dictionary to store the sums and counts of readings for each coordinate
+    readings, coords = aggregate_coordinates(obs.reading, obs.smooth_map_coordinates)
+    
+    return GeophysicalObservations(
+        reading=readings,
+        smooth_map_coordinates=coords,
+        base_map_coordinates=nothing
+    )
+end
 
 
 struct MEState{MB}
@@ -60,7 +76,7 @@ struct MEState{MB}
     # pos: will contain coordinates of agent at every timestep (which is only a subset of coordinates at which observations are made)
     agent_pos_x::Vector{Float64}  
     agent_pos_y::Vector{Float64}
-    agent_bank_angle::Int  # bank angle of agent
+    agent_bank_angle::Vector{Int64}  # bank angle of agent
     geophysical_obs::GeophysicalObservations
 end
 
@@ -76,7 +92,7 @@ struct MEObservation
     agent_heading::Union{Float64, Nothing}
     agent_pos_x::Union{Float64, Nothing}
     agent_pos_y::Union{Float64, Nothing}
-    agent_bank_angle::Union{Int64, Nothing}
+    agent_bank_angle::Union{Vector{Int64}, Nothing}
 end
 
 @with_kw struct MEAction
@@ -117,8 +133,8 @@ abstract type MainbodyGen end
     rng::AbstractRNG = Random.GLOBAL_RNG
     c_exp::Float64 = 1.0
 
-    base_grid_element_length::Int = 60  # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
-    upscale_factor::Int = 10  # factor to upscale the grid by for smooth, higher resolution map
+    base_grid_element_length::Float64 = convert(Float64, 25)  # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
+    upscale_factor::Int = 5  # factor to upscale the grid by for smooth, higher resolution map
     smooth_grid_element_length::Float64 = base_grid_element_length / upscale_factor
     sigma::Float64 = 10  # for smoothing map with gaussian filter
     geophysical_noise_std_dev::Float64 = 0.25
@@ -137,7 +153,7 @@ abstract type MainbodyGen end
     bank_angle_intervals::Int = 5
     timestep_in_seconds::Int = 1
     observations_per_timestep::Int = 1
-    velocity::Int = 70
+    velocity::Int = 50
     extraction_cost::Float64 = 150.0
     extraction_lcb::Float64 = 0.5
     extraction_ucb::Float64 = 0.5

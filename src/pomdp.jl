@@ -157,7 +157,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         end
         smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
 
-        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_x)], d.m.init_bank_angle, GeophysicalObservations())
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_x)], [d.m.init_bank_angle], GeophysicalObservations())
         push!(states, state)
     end
     if n == 1
@@ -253,8 +253,10 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type == :fly
         # get new geophysical observation(s)
-        bank_angle_p = convert(Int64, s.agent_bank_angle + a.change_in_bank_angle)
-        current_geophysical_obs, pos_x, pos_y, heading_p = generate_geophysical_obs_sequence(m, s, a, bank_angle_p)
+
+        new_bank_angle = convert(Int64, last(s.agent_bank_angle) + a.change_in_bank_angle)
+        bank_angle_p = push!(deepcopy(s.agent_bank_angle), new_bank_angle)
+        current_geophysical_obs, pos_x, pos_y, heading_p = generate_geophysical_obs_sequence(m, s, a, new_bank_angle)
     
         # build MEObservation
         stopped_p = false 
@@ -377,7 +379,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, s::MEState)
             return collect(action_set)
         elseif m.mineral_exploration_mode == "geophysical"
             @info "no use of confidence when checking if stop is a permitted action"
-            acts = get_flying_actions(m, s.agent_bank_angle)
+            acts = get_flying_actions(m, last(s.agent_bank_angle))
             push!(acts, MEAction(type=:stop))
             return collect(acts)
         else
@@ -538,15 +540,6 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
     return tmp_go, pos_x, pos_y, heading
 end
 
-function get_base_map_coordinates(x::Float64, y::Float64, m::MineralExplorationPOMDP)
-    # use ceil() because plane at position (10.2, 12.7) in continuous scale should map to (11, 13) in discrete scale
-    return convert(Int64, ceil(x / m.base_grid_element_length)), convert(Int64, ceil(y / m.base_grid_element_length))
-end
-
-function get_smooth_map_coordinates(x::Float64, y::Float64, m::MineralExplorationPOMDP)
-    # use ceil() because plane at position (10.2, 12.7) in continuous scale should map to (11, 13) in discrete scale
-    return convert(Int64, ceil(x / m.smooth_grid_element_length)), convert(Int64, ceil(y / m.smooth_grid_element_length))
-end
 
 function append_geophysical_obs_sequence(history::GeophysicalObservations, new_obs::GeophysicalObservations)
     @info "history $(history.base_map_coordinates)"

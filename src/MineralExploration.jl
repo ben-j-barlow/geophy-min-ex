@@ -42,7 +42,8 @@ export
         MEBelief,
         MainbodyGen,
         GeophysicalObservations,
-        aggregate_base_map_duplicates
+        aggregate_base_map_duplicates,
+        aggregate_smooth_map_duplicates
 include("common.jl")
 
 export
@@ -109,8 +110,19 @@ export
         run_geophysical_trial,
         gen_cases,
         plot_ore_map,
+        plot_map,
         plot_mass_map,
-        plot_volume
+        plot_volume,
+        nan_unvisited_cells,
+        set_readings_in_map,
+        normalize_agent_coordinates,
+        add_agent_trajectory_to_plot!,
+        get_agent_trajectory,
+        plot_smooth_map_and_plane_trajectory,
+        get_base_map_coordinates,
+        get_smooth_map_coordinates,
+        plot_base_map_at_observation_locations,
+        plot_smooth_map_at_observation_locations
 include("utils.jl")
 
 export 

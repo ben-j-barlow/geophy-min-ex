@@ -61,7 +61,7 @@ end
 function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     policy::POMDPs.Policy, s0::MEState, b0::MEBelief;
     display_figs::Bool=true, save_dir::Union{Nothing,String}=nothing,
-    return_final_belief=false, return_all_trees=false, collect_training_data=false,
+    return_final_belief=false, return_all_trees=true, collect_training_data=false,
     cmap=:viridis, verbose::Bool=true)
     @info "start of run trial"
 
@@ -243,7 +243,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
 end
 
 function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
-    policy::POMDPs.Policy, s0::MEState, b0::MEBelief;
+    policy::POMDPs.Policy, s0::MEState, b0::MEBelief; max_t::Int64=1000,
     display_figs::Bool=true, save_dir::Union{Nothing,String}=nothing,
     cmap=:viridis, verbose::Bool=true)
     @info "start of run trial"
@@ -311,7 +311,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     final_state = nothing
     trees = []
     
-    for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=3, rng=m.rng)
+    for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=max_t, rng=m.rng)
         
         discounted_return += POMDPs.discount(m)^(t - 1) * r
         last_action = a.type
@@ -359,10 +359,6 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         final_state = sp
         
         push!(trees, deepcopy(policy.tree))
-        if isa(save_dir, String)
-            path = string(save_dir, "plane_trajectory.png")
-            savefig(plot_plane_trajectory(sp.agent_pos_x, sp.agent_pos_y), path)
-        end
     end
     if verbose
         println("Discounted Return: $discounted_return")
@@ -407,6 +403,11 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             end
         end
 
+        if isa(save_dir, String)
+            path = string(save_dir, "plane_trajectory.png")
+            savefig(plot_plane_trajectory(final_state.agent_bank_angle, m), path)
+        end
+
         #path = string(save_dir, "abs_err.png")
         #savefig(abs_err_fig, path)
 
@@ -426,14 +427,10 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     display(plot_ore_map(final_state.ore_map, cmap, "ore map"))
     display(plot_ore_map(final_state.smooth_map, cmap, "smooth map"))
 
-    return discounted_return, n_flys, final_belief, trees
+    return discounted_return, n_flys, final_belief, final_state, trees
 end
 
-function plot_plane_trajectory(x_list::Vector{Float64}, y_list::Vector{Float64})
-    @info "plot_plane_trajectory(x_list::Vector{Float64}, y_list::Vector{Float64})"
-    return plot(x_list, y_list, label="Trajectory", xlabel="X Position (meters)", ylabel="Y Position (meters)",
-        title="Aircraft Trajectory", legend=:topright, grid=true, axis=:equal)
-end
+
 
 
 function plot_ore_map(ore_map, cmap=:viridis, title="true ore map")
@@ -443,6 +440,12 @@ function plot_ore_map(ore_map, cmap=:viridis, title="true ore map")
     return heatmap(ore_map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
 end
 
+function plot_map(map, title)
+    @info "plot_map(map, title)"
+    xl = (0.5, size(map, 1) + 0.5)
+    yl = (0.5, size(map, 2) + 0.5)
+    return heatmap(map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=:viridis)
+end
 
 function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)
     @info "plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)"
@@ -479,4 +482,138 @@ function plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; 
     ylims!(0, h_height * 1.05)
 
     return (b0_hist, vols, mean_vols, std_vols)
+end
+
+## AGENT RELATED BASE FUNCTIONS ##
+function get_agent_trajectory(bank_angle_history::Vector{Int64}, m::MineralExplorationPOMDP, dt::Float64=0.2)
+    updates_per_timestep = m.timestep_in_seconds / dt
+    pos_x, pos_y, heading = convert(Float64, m.init_pos_x), convert(Float64, m.init_pos_y), convert(Float64, m.init_heading)
+
+    pos_x_outer_loop_history, pos_y_outer_loop_history = [], []
+    pos_x_history, pos_y_history = [deepcopy(pos_x)], [deepcopy(pos_y)]
+
+    # create list of lists
+    for bank_angle in bank_angle_history
+        for i in 1:updates_per_timestep
+            pos_x, pos_y, heading = update_agent_state(pos_x, pos_y, heading, bank_angle * DEG_TO_RAD, m.velocity, dt)
+            push!(pos_x_history, deepcopy(pos_x))
+            push!(pos_y_history, deepcopy(pos_y))
+        end
+        push!(pos_x_outer_loop_history, deepcopy(pos_x_history))
+        push!(pos_y_outer_loop_history, deepcopy(pos_y_history))
+        pos_x_history, pos_y_history = [deepcopy(pos_x)], [deepcopy(pos_y)]
+    end
+    
+    # reduce lists of lists to single list
+    to_plot_x = reduce(vcat, pos_x_outer_loop_history)
+    to_plot_y = reduce(vcat, pos_y_outer_loop_history)
+    return to_plot_x, to_plot_y
+end
+
+function add_agent_trajectory_to_plot!(p, x, y)
+    plot!(p, x, y, color="red", lw=2, label=:none)
+end
+
+function normalize_agent_coordinates(x::Vector{Float64}, y::Vector{Float64}, grid_element_length::Float64, return_continuous::Bool=true)
+    # normalize for plotting on map
+    x = [x / grid_element_length for x in x]
+    y = [y / grid_element_length for y in y]
+    if return_continuous
+        return x, y
+    else
+        return [continuous_to_coordinate(x) for x in x], [continuous_to_coordinate(y) for y in y]
+    end
+end
+
+## MAP RELATED FUNCTIONS ##
+
+# MAP RELATED VALIDATION FUNCTIONS
+function check_coordinates(coordinates::Matrix{Int64})
+    if size(coordinates, 1) != 2
+        error("problem with coordinates 1")
+    end
+    check_duplicate_coordinates(coordinates)
+end
+
+function check_duplicate_coordinates(coordinates::Matrix{Int64})
+    coord_set = Set{Tuple{Int64, Int64}}()
+
+    for i in 1:size(coordinates, 2)
+        coord = (coordinates[1, i], coordinates[2, i])
+        if coord in coord_set
+            error("Duplicate coordinates")
+        end
+        push!(coord_set, coord)
+    end
+end
+
+function check_coordinates_and_readings(coordinates::Matrix{Int64}, readings::Vector{Float64})
+    check_coordinates(coordinates)    
+    if size(coordinates, 2) != length(readings)
+        error("number of readings must match number of coordinates")
+    end
+end
+
+function get_transpose(matrix::Matrix{Int64})
+    return convert(Matrix{Int64}, matrix')
+end
+
+# MAP RELATED BASE FUNCTIONS (functionality)
+function nan_unvisited_cells(matrix::Array{Float64, 3}, coordinates::Union{Matrix{Int64}, Array{Int64, 2}})
+    check_coordinates(coordinates)
+
+    # Create a copy of the matrix to avoid modifying the original
+    result_matrix = fill(NaN, size(matrix))
+    
+    for i in 1:size(coordinates, 2)
+        x, y = coordinates[:, i]
+        result_matrix[x, y, 1] = matrix[x, y, 1]
+    end
+    
+    return result_matrix
+end
+
+function set_readings_in_map(matrix::Array{Float64, 3}, coordinates::Matrix{Int64}, readings::Vector{Float64})
+    check_coordinates_and_readings(coordinates, readings)
+    # Create a copy of the matrix to avoid modifying the original
+    result_matrix = fill(NaN, size(matrix))
+    for i in 1:size(coordinates, 2)
+        x, y = coordinates[:, i]
+        result_matrix[x, y, 1] = readings[i]
+    end
+    return result_matrix
+end
+
+function continuous_to_coordinate(x::Float64)
+    # use ceil() because plane at position (10.2, 12.7) in continuous scale should map to (11, 13) in discrete scale
+    return convert(Int64, ceil(x))
+end
+
+function get_base_map_coordinates(x::Union{Float64, Vector{Float64}}, y::Union{Float64, Vector{Float64}}, m::MineralExplorationPOMDP)
+    return continuous_to_coordinate(x / m.base_grid_element_length), continuous_to_coordinate(y / m.base_grid_element_length)
+end
+
+function get_smooth_map_coordinates(x::Float64, y::Float64, m::MineralExplorationPOMDP)
+    return continuous_to_coordinate(x / m.smooth_grid_element_length), continuous_to_coordinate(y / m.smooth_grid_element_length)
+end
+
+# PLANE AND MAP COMPOUND FUNCTIONS
+function plot_smooth_map_and_plane_trajectory(s::MEState, m::MineralExplorationPOMDP)
+    x, y = get_agent_trajectory(s.agent_bank_angle, m)
+    x, y = normalize_agent_coordinates(x, y, m.smooth_grid_element_length)
+    p = plot_map(s.smooth_map, "geophysical map with plane trajectory")
+    add_agent_trajectory_to_plot!(p, x, y)
+    return p
+end
+
+function plot_base_map_at_observation_locations(s::MEState)
+    geo_obs_dedupe = aggregate_base_map_duplicates(s.geophysical_obs)
+    map_to_plot = nan_unvisited_cells(s.ore_map, geo_obs_dedupe.base_map_coordinates)
+    plot_map(map_to_plot, "base map at observation locations")
+end
+
+function plot_smooth_map_at_observation_locations(s::MEState)
+    geo_obs_dedupe = aggregate_smooth_map_duplicates(s.geophysical_obs)
+    map_to_plot = nan_unvisited_cells(s.smooth_map, geo_obs_dedupe.smooth_map_coordinates)
+    plot_map(map_to_plot, "smooth map at observation locations")
 end

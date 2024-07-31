@@ -27,7 +27,7 @@ struct MEBelief{G}
     geostats::G #GSLIB or GeoStats
     up::MEBeliefUpdater ## include the belief updater
     geophysical_obs::GeophysicalObservations
-    agent_bank_angle::Int
+    agent_bank_angle::Vector{Int64}
 end
 
 # Ensure MEBeliefs can be compared when adding them to dictionaries (using `hash`, `isequal` and `==`)
@@ -56,7 +56,7 @@ function POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)
     end
     acts = MEAction[]
     obs = MEObservation[]
-    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, geophysical_obs, up.m.init_bank_angle)
+    return MEBelief(particles, rock_obs, acts, obs, false, false, up.geostats, up, geophysical_obs, [up.m.init_bank_angle])
 end
 
 # TODO: ParticleFilters.particles
@@ -226,7 +226,7 @@ end
 
 function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation;
-    apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
+    apply_perturbation=true, resample_background_noise::Bool=false, n=up.n)
     @info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation)"
     sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true) # Resample particles based on weights
     mainbody_params = []
@@ -530,7 +530,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
         end
         
         # if not stopped and stop bound not satisfied, return 3 flying actions subject to bank angle (-45 deg, 45 deg) constraints
-        return collect(get_flying_actions(m, b.agent_bank_angle))
+        return collect(get_flying_actions(m, last(b.agent_bank_angle)))
     end
     error("Invalid mineral exploration mode")
 end
@@ -631,7 +631,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
         else
             # add stop and flying actions to the belief tree
-            to_return = get_flying_actions(m, s.agent_bank_angle)
+            to_return = get_flying_actions(m, last(s.agent_bank_angle))
             push!(to_return, MEAction(type=:stop))
             return collect(to_return)
         end
@@ -682,6 +682,8 @@ function std_var(b::MEBelief)
     std(vars)
 end
 
+
+
 function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
     @info "Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)"
     mean, var = summarize(b)
@@ -712,6 +714,66 @@ function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
     end
     fig = plot(fig1, fig2, layout=(1, 2), size=(600, 250))
     return fig
+end
+
+
+function get_belief_plot_title(t, type)
+    allowable_type = ["base", "geophysical"]
+    if !(type in allowable_type)
+        error("type must be one of $allowable_type")
+    end
+
+    if t == nothing
+        mean_title = "belief mean ($type)"
+        std_title = "belief std ($type)"
+    else
+        mean_title = "belief mean ($type; t=$t)"
+        std_title = "belief std  ($type; t=$t)"
+    end
+    return mean_title, std_title
+end
+
+function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)
+    @info "Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)"
+    if m.mineral_exploration_mode == "borehole"
+        return Plots.plot(b, t)
+    elseif m.mineral_exploration_mode == "geophysical"
+        # prepare data for all plots
+        base_map, var = summarize(b)
+        smooth_map_mean = smooth_map_with_filter(base_map, m.sigma, m.upscale_factor)
+        smooth_map_std = smooth_map_with_filter(var, m.sigma, m.upscale_factor)
+
+        # get title of all plots
+        base_mean_title, base_std_title = get_belief_plot_title(t, "base")
+        smooth_mean_title, smooth_std_title = get_belief_plot_title(t, "geophysical")
+
+        # create mean plots
+        p_base_mean = plot_map(base_map, base_mean_title)
+        p_smooth_mean = plot_map(smooth_map_mean, smooth_mean_title)
+
+        # get agent path on respective coordinate systems
+        x, y = get_agent_trajectory(b.agent_bank_angle, m)
+        x_base, y_base = normalize_agent_coordinates(x, y, m.base_grid_element_length)
+        x_smooth, y_smooth = normalize_agent_coordinates(x, y, m.smooth_grid_element_length)
+
+        # make std plots
+        xl = (0.5, size(var, 1) + 0.5)
+        yl = (0.5, size(var, 2) + 0.5)
+        p_base_std = heatmap(sqrt.(var[:, :, 1]), title=base_std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=:viridis, xlims=xl, ylims=yl)
+        p_smooth_std = heatmap(sqrt.(smooth_map_std[:, :, 1]), title=smooth_std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=:viridis, xlims=xl, ylims=yl)
+        
+        # add agent path
+        add_agent_trajectory_to_plot!(p_base_mean, x_base, y_base)
+        add_agent_trajectory_to_plot!(p_base_std, x_base, y_base)
+        add_agent_trajectory_to_plot!(p_smooth_mean, x_smooth, y_smooth)
+        add_agent_trajectory_to_plot!(p_smooth_std, x_smooth, y_smooth)
+
+        # make plots
+        sz = (600, 250)
+        fig_base = plot(p_base_mean, p_base_std, layout=(1, 2), size=sz)
+        fig_smooth = plot(p_smooth_mean, p_smooth_std, layout=(1, 2), size=sz)
+        return fig_base, fig_smooth
+    end
 end
 
 
