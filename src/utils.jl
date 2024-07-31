@@ -427,7 +427,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     display(plot_ore_map(final_state.ore_map, cmap, "ore map"))
     display(plot_ore_map(final_state.smooth_map, cmap, "smooth map"))
 
-    return discounted_return, n_flys, final_belief, final_state, trees
+    return discounted_return, n_flys, final_belief, final_state, trees;
 end
 
 
