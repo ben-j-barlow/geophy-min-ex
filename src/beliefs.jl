@@ -765,19 +765,19 @@ function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)
         xl = (0.5, size(var, 1) + 0.5)
         yl = (0.5, size(var, 2) + 0.5)
         p_base_std = heatmap(sqrt.(var[:, :, 1]), title=base_std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=:viridis, xlims=xl, ylims=yl)
-        p_smooth_std = heatmap(sqrt.(smooth_map_std[:, :, 1]), title=smooth_std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=:viridis, xlims=xl, ylims=yl)
+        #p_smooth_std = heatmap(sqrt.(smooth_map_std[:, :, 1]), title=smooth_std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=:viridis, xlims=xl, ylims=yl)
         
         # add agent path
         add_agent_trajectory_to_plot!(p_base_mean, x_base, y_base)
         add_agent_trajectory_to_plot!(p_base_std, x_base, y_base)
         add_agent_trajectory_to_plot!(p_smooth_mean, x_smooth, y_smooth)
-        add_agent_trajectory_to_plot!(p_smooth_std, x_smooth, y_smooth)
+        #add_agent_trajectory_to_plot!(p_smooth_std, x_smooth, y_smooth)
 
         # make plots
         sz = (600, 250)
         fig_base = plot(p_base_mean, p_base_std, layout=(1, 2), size=sz)
-        fig_smooth = plot(p_smooth_mean, p_smooth_std, layout=(1, 2), size=sz)
-        return fig_base, fig_smooth
+        #fig_smooth = plot(p_smooth_mean, p_smooth_std, layout=(1, 2), size=sz)
+        return fig_base #, fig_smooth
     end
 end
 

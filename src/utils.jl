@@ -316,8 +316,9 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         discounted_return += POMDPs.discount(m)^(t - 1) * r
         last_action = a.type
 
-        b_fig = plot(bp, t; cmap=cmap)
+        b_fig_base = plot(bp, m, t)
         b_hist, vols, mean_vols, std_vols = plot_volume(m, bp, r_massive; t=t, verbose=false)
+        map_and_plane = plot_smooth_map_and_plane_trajectory(sp, m)
 
         if verbose
             @info "\n\n timestep $t"
@@ -334,14 +335,18 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
 
             if isa(save_dir, String)
                 path = string(save_dir, "b$t.png")
-                savefig(b_fig, path)
+                savefig(b_fig_base, path)
 
                 path = string(save_dir, "b$(t)_hist.png")
                 savefig(b_hist, path)
+
+                path = string(save_dir, "plane_trajectory$t.png")
+                savefig(map_and_plane, path)
             end
             if display_figs
-                display(b_fig)
+                display(b_fig_base)
                 display(b_hist)
+                display(map_and_plane)
             end
             #b_mean, b_std = MineralExploration.summarize(bp)
             if isa(save_dir, String)
@@ -403,11 +408,6 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             end
         end
 
-        if isa(save_dir, String)
-            path = string(save_dir, "plane_trajectory.png")
-            savefig(plot_plane_trajectory(final_state.agent_bank_angle, m), path)
-        end
-
         #path = string(save_dir, "abs_err.png")
         #savefig(abs_err_fig, path)
 
@@ -424,9 +424,6 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     #end
 
     #return_values = (discounted_return, abs_errs, rel_errs, vol_stds, n_drills, r_massive, last_action)
-    display(plot_ore_map(final_state.ore_map, cmap, "ore map"))
-    display(plot_ore_map(final_state.smooth_map, cmap, "smooth map"))
-
     return discounted_return, n_flys, final_belief, final_state, trees;
 end
 
@@ -442,8 +439,8 @@ end
 
 function plot_map(map, title)
     @info "plot_map(map, title)"
-    xl = (0.5, size(map, 1) + 0.5)
-    yl = (0.5, size(map, 2) + 0.5)
+    xl = (0.5, size(map, 1) + 150)
+    yl = (0.5, size(map, 2) + 150)
     return heatmap(map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=:viridis)
 end
 
