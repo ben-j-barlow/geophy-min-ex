@@ -216,7 +216,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     
     # drill then stop then mine or abandon
     if a_type == :stop && !stopped && !decided
-        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), s.agent_bank_angle)
+        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), last(s.agent_bank_angle))
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = false
@@ -224,14 +224,14 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type == :abandon && stopped && !decided
         heading_p = convert(Float64, 0)
-        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), s.agent_bank_angle)
+        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), last(s.agent_bank_angle))
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
         
         pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
     elseif a_type == :mine && stopped && !decided
-        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), s.agent_bank_angle)
+        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), last(s.agent_bank_angle))
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = true
@@ -247,7 +247,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         stopped_p = n_bores >= m.max_bores
         decided_p = false
         # include meaningless bank angle since non-nothing bank angle needed for MEBelief construction
-        obs = MEObservation(ore_obs, stopped_p, decided_p, nothing, nothing, nothing, nothing, s.agent_bank_angle)
+        obs = MEObservation(ore_obs, stopped_p, decided_p, nothing, nothing, nothing, nothing, last(s.agent_bank_angle))
 
         # create dummy variables
         pos_x_p, pos_y_p, heading_p, bank_angle_p, geo_obs_p = s.agent_pos_x, s.agent_pos_y, s.agent_heading, s.agent_bank_angle, deepcopy(s.geophysical_obs)
@@ -255,18 +255,19 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         # get new geophysical observation(s)
 
         new_bank_angle = convert(Int64, last(s.agent_bank_angle) + a.change_in_bank_angle)
-        bank_angle_p = push!(deepcopy(s.agent_bank_angle), new_bank_angle)
+        @info "new bank angle is $(new_bank_angle)"
         current_geophysical_obs, pos_x, pos_y, heading_p = generate_geophysical_obs_sequence(m, s, a, new_bank_angle)
     
         # build MEObservation
         stopped_p = false 
         decided_p = false
-        obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, bank_angle_p)
+        obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, new_bank_angle)
 
         # prepare for MEState
         geo_obs_p = append_geophysical_obs_sequence(deepcopy(s.geophysical_obs), current_geophysical_obs)
-        pos_x_p = push!(s.agent_pos_x, pos_x)
-        pos_y_p = push!(s.agent_pos_y, pos_y)
+        pos_x_p = push!(deepcopy(s.agent_pos_x), pos_x)
+        pos_y_p = push!(deepcopy(s.agent_pos_y), pos_y)
+        bank_angle_p = push!(deepcopy(s.agent_bank_angle), new_bank_angle)
 
         # create dummy variable
         rock_obs_p = deepcopy(s.rock_obs)
@@ -497,16 +498,20 @@ function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, 
     # phi - current bank angle, in radians
     # v - current velocity (remains constant)
     # normalizing_factor - factor to normalize x and y position by, corresponds to arbitrary length represented by 1 grid square
+    @info "bank angle received in update_agent_state $(phi)"
 
     # get change in heading, x and y
     psi_dot = g * tan(phi) / v
     x_dot = v * cos(psi)
     y_dot = v * sin(psi)
 
+    @info "heading_dot $(psi_dot), x_dot $(x_dot), y_dot $(y_dot)"
+
     # update heading, x and y
     psi += psi_dot * dt
     x += x_dot * dt
     y += y_dot * dt
+    @info "new heading $(psi), new x $(x), new y $(y)"
     return x, y, psi
 end
 
@@ -524,6 +529,7 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
     for i in 1:m.observations_per_timestep
         @info "\ngenerating observation $(i)"
 
+        @info "bank angle being parsed to update_agent_state"
         pos_x, pos_y, heading = update_agent_state(pos_x, pos_y, heading, bank_angle * DEG_TO_RAD, m.velocity, dt)  # position in meters
         "new position $(pos_x), $(pos_y), $(heading)"
         # convert position in meters to coordinates (including check for map boundaries)
@@ -548,14 +554,6 @@ end
 
 
 function append_geophysical_obs_sequence(history::GeophysicalObservations, new_obs::GeophysicalObservations)
-    @info "history $(history.base_map_coordinates)"
-    @info "history $(history.smooth_map_coordinates)"
-    @info "history $(history.reading)"
-    @info ""
-    @info "new_obs $(new_obs.base_map_coordinates)"
-    @info "new_obs $(new_obs.smooth_map_coordinates)"
-    @info "new_obs $(new_obs.reading)"
-
     history.reading = vcat(history.reading, new_obs.reading)
     history.base_map_coordinates = hcat(history.base_map_coordinates, new_obs.base_map_coordinates)
     history.smooth_map_coordinates = hcat(history.smooth_map_coordinates, new_obs.smooth_map_coordinates)
@@ -570,7 +568,6 @@ function check_plane_within_region(m::MineralExplorationPOMDP, pos_x::Float64, p
     pos_y_on_map = min < pos_y <= max
 
     to_return = pos_x_on_map && pos_y_on_map
-    @info "region check ... x & y on map: $(to_return); pos x $(pos_x) and pos y $(pos_y)"
     return to_return
 end
 

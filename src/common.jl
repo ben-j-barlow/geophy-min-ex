@@ -92,7 +92,7 @@ struct MEObservation
     agent_heading::Union{Float64, Nothing}
     agent_pos_x::Union{Float64, Nothing}
     agent_pos_y::Union{Float64, Nothing}
-    agent_bank_angle::Union{Vector{Int64}, Nothing}
+    agent_bank_angle::Union{Int64, Nothing}
 end
 
 @with_kw struct MEAction
@@ -146,8 +146,8 @@ abstract type MainbodyGen end
     massive_threshold::Float64 = 0.7
     strike_reward::Float64 = 1.0
     init_bank_angle::Int = 0
-    init_pos_x::Int = convert(Float64, 0.0)
-    init_pos_y::Int = convert(Float64, 0.0)
+    init_pos_x::Float64 = convert(Float64, 0.0)
+    init_pos_y::Float64 = convert(Float64, 0.0)
     init_heading::Float64 = convert(Float64, 45)
     max_bank_angle::Int = 45
     bank_angle_intervals::Int = 5

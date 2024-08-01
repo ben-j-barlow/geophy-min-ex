@@ -418,7 +418,10 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
             for p in b.particles
                 # behaviour built into o::MEObservation: plane dynamics are same as in the previous timestep for a in {mine, abandon, or stop}
                 # behaviour built into o::MEObservation: plane dynamics update if (a = fly) & (is_empty(o.geophysical_obs))
-                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, o.agent_heading, o.agent_pos_x, o.agent_pos_y, o.agent_bank_angle, p.geophysical_obs) # Update the state with new observations
+                agent_pos_x_p = push!(deepcopy(p.agent_pos_x), o.agent_pos_x)
+                agent_pos_y_p = push!(deepcopy(p.agent_pos_y), o.agent_pos_y)
+                bank_angle_p = push!(deepcopy(p.agent_bank_angle), o.agent_bank_angle)
+                s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, o.agent_heading, agent_pos_x_p, agent_pos_y_p, bank_angle_p, p.geophysical_obs) # Update the state with new observations
                 push!(bp_particles, s)
             end    
             bp_geophysical_obs = deepcopy(b.geophysical_obs)
@@ -441,8 +444,10 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     bp_stopped = o.stopped
     bp_decided = o.decided
 
+    agent_bank_angle_p = push!(deepcopy(b.agent_bank_angle), o.agent_bank_angle)
+
     return MEBelief(bp_particles, bp_rock, bp_acts, bp_obs, bp_stopped,
-        bp_decided, bp_geostats, up, bp_geophysical_obs, o.agent_bank_angle)
+        bp_decided, bp_geostats, up, bp_geophysical_obs, agent_bank_angle_p)
 end
 
 function Base.rand(rng::AbstractRNG, b::MEBelief)

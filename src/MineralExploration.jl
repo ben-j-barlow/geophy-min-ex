@@ -73,7 +73,9 @@ include("beliefs.jl")
 export
         initialize_data!,
         high_fidelity_obs,
-        calc_massive
+        calc_massive,
+        update_agent_state,
+        generate_geophysical_obs_sequence
 include("pomdp.jl")
 
 export
