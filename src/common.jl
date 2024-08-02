@@ -63,6 +63,26 @@ function aggregate_smooth_map_duplicates(obs::GeophysicalObservations)
     )
 end
 
+function Base.isequal(go1::GeophysicalObservations, go2::GeophysicalObservations)
+    error("this functions has not been tested")
+    if isempty(go1)
+        if isempty(go2)
+            return true
+        else
+            return false
+        end
+    else
+        if isempty(go2)
+            return false
+        else
+            base_coords = go1.base_map_coordinates == go2.base_map_coordinates 
+            smooth_coords = go1.smooth_map_coordinates == go2.smooth_map_coordinates
+            reading = go1.reading == go2.reading
+            return base_coords & smooth_coords & reading
+        end
+    end
+    
+end
 
 struct MEState{MB}
     ore_map::Array{Float64}  # 3D array of ore_quality values for each grid-cell

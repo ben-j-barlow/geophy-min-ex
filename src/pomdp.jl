@@ -499,21 +499,21 @@ function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, 
     # v - current velocity (remains constant)
     # normalizing_factor - factor to normalize x and y position by, corresponds to arbitrary length represented by 1 grid square
     @info "bank angle received in update_agent_state $(phi)"
-
+    error("stick to dt = 1 for now")
     # get updated heading
     psi_dot = g * tan(phi) / v
-    psi += psi_dot * dt
+    to_return_psi = psi + (psi_dot * dt)
 
     # get change in x and y
     x_dot = v * cos(psi)
     y_dot = v * sin(psi)
 
     # update x and y
-    x += x_dot * dt
-    y += y_dot * dt
+    to_return_x = x + (x_dot * dt)
+    to_return_y = y + (y_dot * dt)
     @info "heading_dot $(psi_dot), x_dot $(x_dot), y_dot $(y_dot)"
     @info "new heading $(psi), new x $(x), new y $(y)"
-    return x, y, psi
+    return to_return_x, to_return_y, to_return_psi
 end
 
 

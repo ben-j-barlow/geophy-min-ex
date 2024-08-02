@@ -75,7 +75,9 @@ export
         high_fidelity_obs,
         calc_massive,
         update_agent_state,
-        generate_geophysical_obs_sequence
+        generate_geophysical_obs_sequence,
+        is_empty,
+        check_plane_within_region
 include("pomdp.jl")
 
 export
