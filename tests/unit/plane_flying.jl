@@ -33,9 +33,10 @@ function run_and_plot_simulation(total_time, dt, v=20, g=9.81)
     end
 
     # Plotting the trajectory
-    plot(y_list, x_list, label="Trajectory", xlabel="X Position (meters)", ylabel="Y Position (meters)", 
+    p = plot(y_list, x_list, label="Trajectory", xlabel="X Position (meters)", ylabel="Y Position (meters)", 
         title="Aircraft Trajectory", legend=:topright, grid=true, axis=:equal, aspect_ratio=1)
+    return x_list, y_list, p    
 end
 
 # Example usage
-run_and_plot_simulation(140, 1.0)
+x_out, y_out, p1 = run_and_plot_simulation(140, 1.0);
