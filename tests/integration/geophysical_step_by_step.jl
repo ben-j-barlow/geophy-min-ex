@@ -84,13 +84,15 @@ s1_copy = deepcopy(s1);
 
 println("Mismatched properties: " * join([p for p in propertynames(s0) if !isequal(getproperty(s0, p), getproperty(s0_copy, p))], ", "))
 s0.geophysical_obs
-s0_copy.geophysical_obs
+#s0_copy.geophysical_obs
 # I HAVE IMPLEMENTED THE ISEQUAL FUNCTION FOR GeophysicalObservations BUT I HAVE NOT TESTED IT
 
 x, y = o.agent_pos_x, o.agent_pos_y;
 @assert last(s1.agent_pos_x) == x
 @assert last(s1.agent_pos_y) == y
 x
+s1.agent_pos_x
+s1.agent_pos_y
 o.geophysical_obs.smooth_map_coordinates
 
 # run update : inspect b0, a, o vs copied version

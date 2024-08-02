@@ -26,7 +26,7 @@ ds0 = POMDPs.initialstate(m)
 b0 = POMDPs.initialize_belief(up, ds0) #Checked
 s0 = rand(ds0);
 
-a = MEAction(type=:fly, change_in_bank_angle=0)
+a = MEAction(type=:fly, change_in_bank_angle=5)
 
 s = deepcopy(s0)
 b = deepcopy(b0)
@@ -36,8 +36,13 @@ for i in 1:20
     o = out[:o];
     sp = out[:sp];
     r = out[:r];
-    bp, ui = update_info(up, b, a, o)
+    bp, ui = update_info(up, b, a, o);
 
-    s = deepcopy(sp)
-    b = deepcopy(bp)
+    s = deepcopy(sp);
+    b = deepcopy(bp);
 end
+
+plot_smooth_map_and_plane_trajectory(s, m)
+
+#straight_x = deepcopy(s.agent_pos_x)
+#straight_y = deepcopy(s.agent_pos_y)
