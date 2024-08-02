@@ -7,10 +7,11 @@ const DEG_TO_RAD = π / 180
 # Function to update positions and heading
 function update_position(x, y, psi, phi, v, dt, g)
     psi_dot = g * tan(phi) / v
+    psi += psi_dot * dt
+    
     x_dot = v * cos(psi)
     y_dot = v * sin(psi)
 
-    psi += psi_dot * dt
     x += x_dot * dt
     y += y_dot * dt
     return x, y, psi
@@ -29,16 +30,19 @@ function run_and_plot_simulation(total_time, dt, v=20, g=9.81)
         phi_change = rand([-5, 5]) * DEG_TO_RAD
         phi += phi_change
         phi = -5 * DEG_TO_RAD
-    
-        x, y, psi = update_position(x, y, psi, phi, v, dt, g)
-    
-        push!(x_list, x)
-        push!(y_list, y)
+
+        a, b, heading = update_position(x, y, psi, phi, v, dt, g)
+        push!(x_list, deepcopy(a))
+        push!(y_list, deepcopy(b))
+
+        x = deepcopy(a)
+        y = deepcopy(b)
+        psi = deepcopy(heading)
     end
 
     # Plotting the trajectory
-    plot(x_list, y_list, label="Trajectory", xlabel="X Position (meters)", ylabel="Y Position (meters)", 
-        title="Aircraft Trajectory", legend=:topright, grid=true, axis=:equal)
+    plot(y_list, x_list, label="Trajectory", xlabel="X Position (meters)", ylabel="Y Position (meters)", 
+        title="Aircraft Trajectory", legend=:topright, grid=true, axis=:equal, aspect_ratio=1)
 end
 
 # Example usage
@@ -50,23 +54,6 @@ a[end] = 4
 last(a)
 
 
-function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, v::Int, dt::Float64 = 1.0, g::Float64 = 9.81)
-    # psi - current heading
-    # phi - current bank angle, in radians
-    # v - current velocity (remains constant)
-    # normalizing_factor - factor to normalize x and y position by, corresponds to arbitrary length represented by 1 grid square
-
-    # get change in heading, x and y
-    psi_dot = g * tan(phi) / v
-    x_dot = v * cos(psi)
-    y_dot = v * sin(psi)
-
-    # update heading, x and y
-    psi += psi_dot * dt
-    x += x_dot * dt
-    y += y_dot * dt
-    return x, y, psi
-end
 
 
 # PLANE FLYING SETUP

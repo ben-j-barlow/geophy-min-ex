@@ -83,26 +83,6 @@ function normalize_plane_coordinates(x::Vector{Float64}, y::Vector{Float64}, gri
     return x, y
 end
 
-function update_agent_state(x::Float64, y::Float64, psi::Float64, phi::Float64, v::Int, dt::Float64 = 1.0, g::Float64 = 9.81)
-    # psi - current heading
-    # phi - current bank angle, in radians
-    # v - current velocity (remains constant)
-    # normalizing_factor - factor to normalize x and y position by, corresponds to arbitrary length represented by 1 grid square
-
-    # get change in heading, x and y
-    psi_dot = g * tan(phi) / v
-    x_dot = v * cos(psi)
-    y_dot = v * sin(psi)
-
-    # update heading, x and y
-    psi += psi_dot * dt
-    x += x_dot * dt
-    y += y_dot * dt
-    return x, y, psi
-end
-
-
-
 plot_map_and_plane_trajectory(s0.smooth_map, bank_angle_history, m, m.smooth_grid_element_length)
 
 x,y = get_plane_trajectory(bank_angle_history, m)
