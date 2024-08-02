@@ -439,8 +439,8 @@ end
 
 function plot_map(map, title)
     @info "plot_map(map, title)"
-    xl = (0.5, size(map, 1) + 150)
-    yl = (0.5, size(map, 2) + 150)
+    xl = (0.5, size(map, 1) + 0.5)
+    yl = (0.5, size(map, 2) + 0.5)
     return heatmap(map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=:viridis)
 end
 
@@ -490,7 +490,7 @@ function get_agent_trajectory(bank_angle_history::Vector{Int64}, m::MineralExplo
     pos_x_history, pos_y_history = [deepcopy(pos_x)], [deepcopy(pos_y)]
 
     # create list of lists
-    for bank_angle in bank_angle_history
+    for bank_angle in bank_angle_history[2:end] # ignore initial bank angle since it does not affect flight
         for i in 1:updates_per_timestep
             pos_x, pos_y, heading = update_agent_state(pos_x, pos_y, heading, bank_angle * DEG_TO_RAD, m.velocity, dt)
             push!(pos_x_history, deepcopy(pos_x))
@@ -576,6 +576,7 @@ function set_readings_in_map(matrix::Array{Float64, 3}, coordinates::Matrix{Int6
     result_matrix = fill(NaN, size(matrix))
     for i in 1:size(coordinates, 2)
         x, y = coordinates[:, i]
+        # TODO: xy
         result_matrix[x, y, 1] = readings[i]
     end
     return result_matrix
