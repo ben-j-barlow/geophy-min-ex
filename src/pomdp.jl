@@ -157,7 +157,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         end
         smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
 
-        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_x)], [d.m.init_bank_angle], GeophysicalObservations())
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_y)], [d.m.init_bank_angle], GeophysicalObservations())
         push!(states, state)
     end
     if n == 1
@@ -265,9 +265,9 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
 
         # prepare for MEState
         geo_obs_p = append_geophysical_obs_sequence(deepcopy(s.geophysical_obs), current_geophysical_obs)
-        pos_x_p = push!(deepcopy(s.agent_pos_x), pos_x)
-        pos_y_p = push!(deepcopy(s.agent_pos_y), pos_y)
-        bank_angle_p = push!(deepcopy(s.agent_bank_angle), new_bank_angle)
+        pos_x_p = push!(deepcopy(s.agent_pos_x), deepcopy(pos_x))
+        pos_y_p = push!(deepcopy(s.agent_pos_y), deepcopy(pos_y))
+        bank_angle_p = push!(deepcopy(s.agent_bank_angle), deepcopy(new_bank_angle))
 
         # create dummy variable
         rock_obs_p = deepcopy(s.rock_obs)
