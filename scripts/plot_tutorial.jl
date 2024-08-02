@@ -15,17 +15,29 @@ N_PARTICLES = 1000
 NOISE_FOR_PERTURBATION = 2.0
 C_EXP = 2
 
-m = MineralExplorationPOMDP(c_exp=C_EXP, sigma=20)
+grid_dims = (50, 50, 1)
+m = MineralExplorationPOMDP(
+    grid_dim=grid_dims,
+    c_exp=C_EXP,
+    mainbody_gen=BlobNode(grid_dims=grid_dims),
+    true_mainbody_gen=BlobNode(grid_dims=grid_dims),
+    timestep_in_seconds=2,
+    observations_per_timestep=1,
+    velocity=50,
+    geophysical_noise_std_dev=0
+)
 
 ds0 = POMDPs.initialstate(m)
 
+Random.seed!(52992)
 s0 = rand(ds0; truth=true) #Checked
+up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION); #Checked
+b0 = POMDPs.initialize_belief(up, ds0); #Checked
 
-up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION) #Checked
-b0 = POMDPs.initialize_belief(up, ds0) #Checked
+
 solver = POMCPOWSolver(
-    tree_queries=400,
-    max_depth=4,
+    tree_queries=4000,
+    max_depth=6,
     check_repeat_obs=true,
     check_repeat_act=true,
     enable_action_pw=false,
@@ -37,11 +49,11 @@ solver = POMCPOWSolver(
     tree_in_info=false,
 )
 planner = POMDPs.solve(solver, m)
-discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=1);
+discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=30, save_dir="./data/sandbox/tmp");
 
-using D3Trees
-tree_1 = trees[1]
-inbrowser(D3Tree(tree_1, init_expand=1), "safari")
+#using D3Trees
+#tree_1 = trees[1]
+#inbrowser(D3Tree(tree_1, init_expand=1), "safari")
 
 
 # plot normal map with custom title

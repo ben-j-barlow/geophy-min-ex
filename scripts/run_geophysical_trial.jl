@@ -2,8 +2,7 @@ using Revise
 import BSON: @save, @load
 using POMDPs
 using POMCPOW
-using Plots;
-default(fontfamily="Computer Modern", framestyle=:box); # LaTex-style
+using Plots;default(fontfamily="Computer Modern", framestyle=:box); # LaTex-style
 using Statistics
 using Images
 using Random
@@ -20,11 +19,16 @@ C_EXP = 2
 
 #io = MineralExploration.prepare_logger()
 
+grid_dims = (50, 50, 1)
+
 m = MineralExplorationPOMDP(
+    grid_dim=grid_dims,
     c_exp=C_EXP,
     sigma=20,
     init_heading=-225,
-    out_of_bounds_cost=0
+    out_of_bounds_cost=0,
+    mainbody_gen=BlobNode(grid_dims=grid_dims),
+    true_mainbody_gen=BlobNode(grid_dims=grid_dims)
 )
 
 # do not call
@@ -38,7 +42,7 @@ up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION) #Checked
 b0 = POMDPs.initialize_belief(up, ds0) #Checked
 
 tree_queries = [3, 5, 10, 100, 1_000, 5000, 10_000]
-i_tree_queries = 3
+i_tree_queries = 4
 
 solver = POMCPOWSolver(
     tree_queries=tree_queries[i_tree_queries],
@@ -52,7 +56,7 @@ solver = POMCPOWSolver(
     alpha_observation=0.1,
     criterion=POMCPOW.MaxUCB(m.c_exp),
     final_criterion=POMCPOW.MaxQ(),
-    max_depth=2,
+    max_depth=3,
     estimate_value=leaf_estimation,
     tree_in_info=true,
 )
