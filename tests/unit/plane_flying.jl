@@ -12,7 +12,7 @@ const DEG_TO_RAD = π / 180
 # Simulation loop
 function run_and_plot_simulation(total_time, dt, v=20, g=9.81)
     # Initial conditions
-    x, y, psi = 0.0, 0.0, 45.0  # initial positions and heading angle
+    x, y, psi = 30.0, 0.0, 0.0  # initial positions and heading angle
     phi = 0  # initial bank angle
 
     # Lists to store trajectory
@@ -39,4 +39,35 @@ function run_and_plot_simulation(total_time, dt, v=20, g=9.81)
 end
 
 # Example usage
-x_out, y_out, p1 = run_and_plot_simulation(140, 1.0);
+x_out, y_out, p1 = run_and_plot_simulation(80, 1.0);
+p1
+
+a = (230, 10)
+plot!(p1, [a[2]], [a[1]], seriestype = :scatter, label="Target", color="red")
+
+
+
+using POMDPs
+using Plots
+using MineralExploration
+using Random
+
+m = MineralExplorationPOMDP();
+ds0 = POMDPs.initialstate(m);
+Random.seed!(100)
+s0 = rand(ds0);
+
+init_x = 25.0
+init_y = 5.0
+init_heading = 90.0 * DEG_TO_RAD
+velocity = 20
+
+x,y,heading = update_agent_state(init_x, init_y, init_heading, 0.0, velocity)
+
+x_list = [init_x, x]
+y_list = [init_y, y]
+
+p = plot_map(s0.ore_map, "ore")
+plot!(p, x_list, y_list, seriestype = :scatter, label="Plot by hand", color="red")
+add_agent_trajectory_to_plot!(p, x_list, y_list)
+
