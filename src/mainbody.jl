@@ -8,7 +8,7 @@
 end
 
 function Base.rand(rng::Random.AbstractRNG, mb::SingleFixedNode)
-    @info "rand(rng::Random.AbstractRNG, mb::SingleFixedNode)"
+    #@info "rand(rng::Random.AbstractRNG, mb::SingleFixedNode)"
     x_dim = mb.grid_dims[1]
     y_dim = mb.grid_dims[2]
     lode_map = zeros(Float64, x_dim, y_dim)
@@ -28,7 +28,7 @@ Base.rand(mb::SingleFixedNode) = rand(Random.GLOBAL_RNG, mb)
 perturb_sample(mb::SingleFixedNode, mainbody_var::Float64, noise::Float64) = perturb_sample(Random.GLOBAL_RNG, mb, mainbody_var, noise)
 
 function perturb_sample(rng::Random.AbstractRNG, mb::SingleFixedNode, mainbody_var::Float64, noise::Float64)
-    @info "perturb_sample(rng::Random.AbstractRNG, mb::SingleFixedNode, mainbody_var::Float64, noise::Float64)"
+    #@info "perturb_sample(rng::Random.AbstractRNG, mb::SingleFixedNode, mainbody_var::Float64, noise::Float64)"
     mainbody_var += 2.0*(rand(rng) - 0.5)*noise
     mainbody_var = clamp(mainbody_var, 0.0, Inf)
     mainbody_map = zeros(Float64, Int(mb.grid_dims[1]), Int(mb.grid_dims[2]))
@@ -51,7 +51,7 @@ end
 end
 
 function Base.rand(rng::Random.AbstractRNG, mb::SingleVarNode)
-    @info "rand(rng::Random.AbstractRNG, mb::SingleVarNode)"
+    #@info "rand(rng::Random.AbstractRNG, mb::SingleVarNode)"
     x_dim = mb.grid_dims[1]
     y_dim = mb.grid_dims[2]
     lode_map = zeros(Float64, x_dim, y_dim)
@@ -73,7 +73,7 @@ Base.rand(mb::SingleVarNode) = rand(Random.GLOBAL_RNG, mb)
 perturb_sample(mb::SingleVarNode, mainbody_params::Vector{Float64}, noise::Float64) = perturb_sample(Random.GLOBAL_RNG, mb, mainbody_params, noise)
 
 function perturb_sample(rng::Random.AbstractRNG, mb::SingleVarNode, mainbody_params::Vector{Float64}, noise::Float64)
-    @info "perturb_sample(rng::Random.AbstractRNG, mb::SingleVarNode, mainbody_params::Vector{Float64}, noise::Float64)"
+    #@info "perturb_sample(rng::Random.AbstractRNG, mb::SingleVarNode, mainbody_params::Vector{Float64}, noise::Float64)"
     mainbody_loc = mainbody_params[1:2]
     mainbody_var = mainbody_params[3]
 
@@ -103,7 +103,7 @@ end
 
 
 function Base.rand(rng::Random.AbstractRNG, mb::MultiVarNode)
-    @info "rand(rng::Random.AbstractRNG, mb::MultiVarNode)"
+    #@info "rand(rng::Random.AbstractRNG, mb::MultiVarNode)"
 
     # Extract the dimensions of the grid from the mb (MultiVarNode) object
     x_dim = mb.grid_dims[1]
@@ -161,7 +161,7 @@ Base.rand(mb::MultiVarNode) = rand(Random.GLOBAL_RNG, mb)
 perturb_sample(mb::MultiVarNode, mainbody_params::Vector, noise::Float64) = perturb_sample(Random.GLOBAL_RNG, mb, mainbody_params, noise)
 
 function perturb_sample(rng::Random.AbstractRNG, mb::MultiVarNode, mainbody_params::Vector, noise::Float64)
-    @info "perturb_sample(rng::Random.AbstractRNG, mb::MultiVarNode, mainbody_params::Vector, noise::Float64)"
+    #@info "perturb_sample(rng::Random.AbstractRNG, mb::MultiVarNode, mainbody_params::Vector, noise::Float64)"
     
     x_dim = mb.grid_dims[1]
     y_dim = mb.grid_dims[2]

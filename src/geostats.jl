@@ -9,7 +9,7 @@ mutable struct LUParams
 end
 #function LUParams(rng::AbstractRNG, γ::Variogram, domain::CartesianGrid)
 function LUParams(γ::Variogram, domain::CartesianGrid)
-    @info "LUParams(γ::Variogram, domain::CartesianGrid)"
+    #@info "LUParams(γ::Variogram, domain::CartesianGrid)"
     z₁ = Float64[0.0]
     d₂ = Float64[0.0]
     slocs = [l for l in 1:nelements(domain)] # if l ∉ dlocs]
@@ -43,13 +43,13 @@ end
 
 function update!(d::GeoStatsDistribution, o::Union{RockObservations, GeophysicalObservations})
     if isa(o, RockObservations)
-        @info "update!(d::GeoStatsDistribution, o::RockObservations)"
+        #@info "update!(d::GeoStatsDistribution, o::RockObservations)"
         d.data.ore_quals = o.ore_quals
         d.data.coordinates = o.coordinates
         table = DataFrame(ore=d.data.ore_quals .- d.mean)
         domain = PointSet(d.data.coordinates)
     elseif isa(o, GeophysicalObservations)
-        @info "update!(d::GeoStatsDistribution, o::GeophysicalObservations)"
+        #@info "update!(d::GeoStatsDistribution, o::GeophysicalObservations)"
         d.geophysical_data.reading = o.reading
         d.geophysical_data.base_map_coordinates = o.base_map_coordinates
         table = DataFrame(ore=d.geophysical_data.reading .- d.mean)
@@ -89,7 +89,7 @@ end
 
 
 function calc_covs(d::GeoStatsDistribution, problem)
-    @info "calc_covs(d::GeoStatsDistribution, problem)"
+    #@info "calc_covs(d::GeoStatsDistribution, problem)"
     pdata = data(problem)
     pdomain = domain(problem)
 
@@ -135,7 +135,7 @@ optionally using multiple processes `procs`.
 Default implementation calls `solvesingle` in parallel.
 """
 function solve_nopreproc(problem::SimulationProblem, solver::LUGS, preproc::Dict; procs=[GeoStats.GeoStatsBase.myid()])
-    @info "solve_nopreproc(problem::SimulationProblem, solver::LUGS, preproc::Dict; procs=[GeoStats.GeoStatsBase.myid()])"
+    #@info "solve_nopreproc(problem::SimulationProblem, solver::LUGS, preproc::Dict; procs=[GeoStats.GeoStatsBase.myid()])"
     # sanity checks
     @assert targets(solver) ⊆ name.(variables(problem)) "invalid variables in solver"
 
@@ -180,7 +180,7 @@ function solve_nopreproc(problem::SimulationProblem, solver::LUGS, preproc::Dict
 end
 
 function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, n::Int64=1)
-    @info "Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, n::Int64=1)"
+    #@info "Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, n::Int64=1)"
     if isempty(d.data.coordinates) # Unconditional simulation
         problem = SimulationProblem(d.domain, (:ore => Float64), n)
     else
@@ -194,7 +194,7 @@ end
 
 function Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, dummy_geo_obs::GeophysicalObservations, n::Int64=1)
     # use multiple dispatch to run different code based on geophysical data
-    @info "Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, dummy_geo_obs::GeophysicalObservations, n::Int64=1)"
+    #@info "Base.rand(rng::AbstractRNG, d::GeoStatsDistribution, dummy_geo_obs::GeophysicalObservations, n::Int64=1)"
     table = DataFrame(ore=d.geophysical_data.reading .- d.mean)
     domain = PointSet(d.geophysical_data.base_map_coordinates)
     geodata = georef(table, domain)

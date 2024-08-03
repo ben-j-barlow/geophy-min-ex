@@ -1,3 +1,10 @@
+const DEG_TO_RAD = π / 180
+
+const HEAD_EAST = 0
+const HEAD_NORTH = 90 * DEG_TO_RAD
+const HEAD_WEST = 180 * DEG_TO_RAD
+const HEAD_SOUTH = 270 * DEG_TO_RAD
+
 @with_kw mutable struct RockObservations
     ore_quals::Vector{Float64} = Vector{Float64}()
     coordinates::Matrix{Int64} = zeros(Int64, 2, 0)

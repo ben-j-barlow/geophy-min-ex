@@ -40,6 +40,10 @@ export
         MineralExplorationPOMDP,
         MEInitStateDist,
         MEBelief,
+        HEAD_NORTH,
+        HEAD_SOUTH,
+        HEAD_EAST,
+        HEAD_WEST,
         MainbodyGen,
         GeophysicalObservations,
         aggregate_base_map_duplicates,
@@ -126,7 +130,8 @@ export
         get_base_map_coordinates,
         get_smooth_map_coordinates,
         plot_base_map_at_observation_locations,
-        plot_smooth_map_at_observation_locations
+        plot_smooth_map_at_observation_locations,
+        normalize_agent_coordinates
 include("utils.jl")
 
 export 

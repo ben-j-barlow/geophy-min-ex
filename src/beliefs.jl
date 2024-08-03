@@ -45,7 +45,7 @@ Base.:(==)(b1::MEBelief, b2::MEBelief) = isequal(b1, b2)
 
 
 function POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)
-    @info "POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)"
+    #@info "POMDPs.initialize_belief(up::MEBeliefUpdater, d::MEInitStateDist)"
     particles = rand(up.rng, d, up.n)
     if up.m.mineral_exploration_mode == "borehole"
         rock_obs = RockObservations(up.m.initial_data.ore_quals, up.m.initial_data.coordinates)
@@ -66,7 +66,7 @@ POMDPs.support(b::MEBelief) = POMDPs.support(particles(b))
 
 
 function calc_K(geostats::GeoDist, rock_obs::RockObservations)
-    @info "calc_K(geostats::GeoDist, rock_obs::RockObservations)"
+    #@info "calc_K(geostats::GeoDist, rock_obs::RockObservations)"
     # Check if the geostats object is of type GeoStatsDistribution
     if isa(geostats, GeoStatsDistribution)
         # If true, use the domain and variogram from the geostats object
@@ -99,14 +99,14 @@ function calc_K(geostats::GeoDist, rock_obs::RockObservations)
     # Calculate the covariance matrix K
     K = GeoStats.sill(γ) .- GeoStats.pairwise(γ, 𝒟d)
 
-    @info "covar matrix $(typeof(K))"
-    @info "covar matrix $(size(K))"
+    #@info "covar matrix $(typeof(K))"
+    #@info "covar matrix $(size(K))"
     # Return the covariance matrix K
     return K
 end
 
 function calc_K(geostats::GeoDist, geophysical_obs::GeophysicalObservations)
-    @info "calc_K(geostats::GeoDist, geophysical_obs::GeophysicalObservations)"
+    #@info "calc_K(geostats::GeoDist, geophysical_obs::GeophysicalObservations)"
     # exactly the same implementation as calc_K(geostats::GeoDist, rock_obs::RockObservations)
     # difference is some indexes of K will correspond to the same coordinates rather than all being unique
     γ = geostats.variogram
@@ -117,7 +117,7 @@ end
 
 
 function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)
-    @info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)"
+    #@info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, rock_obs::RockObservations)"
     ws = Float64[]
     bore_coords = rock_obs.coordinates
     n = size(bore_coords)[2]
@@ -142,7 +142,7 @@ end
 
 
 function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geophysical_obs::GeophysicalObservations)
-    @info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geophysical_obs::GeophysicalObservations)"
+    #@info "reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geophysical_obs::GeophysicalObservations)"
     ws = Float64[]
     
     # dedupe observations from same square
@@ -156,9 +156,9 @@ function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geo
 
     ore_obs = [o for o in geo_obs_dedupe.reading]
     K = calc_K(geostats, geo_obs_dedupe)
-    @info "coordinates $(coords)"
-    @info "K: $(size(K))"
-    @info "K $K"
+    #@info "coordinates $(coords)"
+    #@info "K: $(size(K))"
+    #@info "K $K"
     mu = zeros(Float64, n) .+ up.m.gp_mean
     gp_dist = MvNormal(mu, K)
     for p in particles
@@ -180,7 +180,7 @@ end
 function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation;
     apply_perturbation=true, resample_background_noise::Bool=true, n=up.n)
-    @info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)"
+    #@info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)"
     sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true) # Resample particles based on weights
     mainbody_params = [] # Initialize array for main body parameters
     particles = MEState[] # Initialize array for resampled particles
@@ -227,7 +227,7 @@ end
 function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation;
     apply_perturbation=true, resample_background_noise::Bool=false, n=up.n)
-    @info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation)"
+    #@info "resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64}, geostats::GeoDist, geo_obs::GeophysicalObservations, a::MEAction, o::MEObservation)"
     sampled_particles = sample(up.rng, particles, StatsBase.Weights(wp), n, replace=true) # Resample particles based on weights
     mainbody_params = []
     particles = MEState[]
@@ -289,7 +289,7 @@ end
 
 function update_particles(up::MEBeliefUpdater, particles::Vector{MEState},
     geostats::GeoDist, obs::Union{GeophysicalObservations,RockObservations}, a::MEAction, o::MEObservation)
-    @info "update_particles"
+    #@info "update_particles"
     wp = reweight(up, geostats, particles, obs)
     pp = resample(up, particles, wp, geostats, obs, a, o)
     return pp
@@ -298,7 +298,7 @@ end
 
 function update_particles_perturbed_inject(up::MEBeliefUpdater, particles::Vector{MEState},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
-    @info "update_particles_perturbed_inject"
+    #@info "update_particles_perturbed_inject"
     m = 50 # TODO: parameterize `m`
     wp = reweight(up, geostats, particles, rock_obs)
     injected_particles = resample(up, particles, wp, geostats, rock_obs, a, o; apply_perturbation=true, n=m)
@@ -310,7 +310,7 @@ end
 
 
 function reweight_abc(up::MEBeliefUpdater, particles::Vector, rock_obs::RockObservations)
-    @info "reweight_abc(up::MEBeliefUpdater, particles::Vector, rock_obs::RockObservations)"
+    #@info "reweight_abc(up::MEBeliefUpdater, particles::Vector, rock_obs::RockObservations)"
     ws = Float64[]
     ϵ = up.abc_ϵ
     rho = up.abc_dist
@@ -335,21 +335,21 @@ end
 
 function update_particles_abc(up::MEBeliefUpdater, particles::Vector{MEState},
     geostats::GeoDist, rock_obs::RockObservations, a::MEAction, o::MEObservation)
-    @info "update_particles_abc"
+    #@info "update_particles_abc"
     wp = reweight_abc(up, particles, rock_obs)
     pp = resample(up, particles, wp, geostats, rock_obs, a, o; apply_perturbation=false, resample_background_noise=false)
     return pp
 end
 
 function inject_particles(up::MEBeliefUpdater, n::Int64)
-    @info "inject_particles(up::MEBeliefUpdater, n::Int64)"
+    #@info "inject_particles(up::MEBeliefUpdater, n::Int64)"
     d = POMDPs.initialstate_distribution(up.m) # TODO. Keep as part of `MEBeliefUpdater`
     return rand(up.rng, d, n)
 end
 
 function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     a::MEAction, o::MEObservation)
-    @info "POMDPs.update(up::MEBeliefUpdater, b::MEBelief, a::MEAction, o::MEObservation)"
+    #@info "POMDPs.update(up::MEBeliefUpdater, b::MEBelief, a::MEAction, o::MEObservation)"
 
     if up.m.mineral_exploration_mode == "borehole"
         bp_geophysical_obs = deepcopy(b.geophysical_obs)
@@ -451,14 +451,14 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
 end
 
 function Base.rand(rng::AbstractRNG, b::MEBelief)
-    @info "Base.rand(rng::AbstractRNG, b::MEBelief)"
+    #@info "Base.rand(rng::AbstractRNG, b::MEBelief)"
     return rand(rng, b.particles)
 end
 
 Base.rand(b::MEBelief) = rand(Random.GLOBAL_RNG, b)
 
 function summarize(b::MEBelief)
-    @info "summarize(b::MEBelief)"
+    #@info "summarize(b::MEBelief)"
     (x, y, z) = size(b.particles[1].ore_map)
     μ = zeros(Float64, x, y, z)
     w = 1.0 / length(b.particles)
@@ -475,7 +475,7 @@ function summarize(b::MEBelief)
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
-    @info "POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)"
+    #@info "POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)"
     if m.mineral_exploration_mode == "borehole"
         if b.stopped
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
@@ -541,7 +541,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
 end
 
 function calculate_stop_bound(m::MineralExplorationPOMDP, b::MEBelief)
-    @info "calculate_stop_bound()"
+    #@info "calculate_stop_bound()"
     volumes = Float64[]
     for p in b.particles
         v = calc_massive(m, p)
@@ -549,39 +549,39 @@ function calculate_stop_bound(m::MineralExplorationPOMDP, b::MEBelief)
     end
     mean_volume = Statistics.mean(volumes)
     volume_std = Statistics.std(volumes)
-    @info "mean_volume $(mean_volume)"
-    @info "volume_std $(volume_std)"
+    #@info "mean_volume $(mean_volume)"
+    #@info "volume_std $(volume_std)"
 
     lcb = mean_volume - volume_std*m.extraction_lcb
     ucb = mean_volume + volume_std*m.extraction_ucb
 
-    @info "lcb is $(lcb) = $(mean_volume - volume_std*m.extraction_lcb) >= $(m.extraction_cost) which is extraction cost"
-    @info "ucb is $(ucb) = $(mean_volume + volume_std*m.extraction_lcb) <= $(m.extraction_cost) which is extraction cost"
+    #@info "lcb is $(lcb) = $(mean_volume - volume_std*m.extraction_lcb) >= $(m.extraction_cost) which is extraction cost"
+    #@info "ucb is $(ucb) = $(mean_volume + volume_std*m.extraction_lcb) <= $(m.extraction_cost) which is extraction cost"
 
     cond1 = lcb >= m.extraction_cost
     cond2 = ucb <= m.extraction_cost
     
-    @info "cond1 $(cond1)"
-    @info "cond2 $(cond2)"
+    #@info "cond1 $(cond1)"
+    #@info "cond2 $(cond2)"
     
     to_return =  cond1 || cond2
-    @info "calculate stop bound returning $(to_return)"
+    #@info "calculate stop bound returning $(to_return)"
     return to_return
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
-    @info "POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)"
+    #@info "POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)"
     if m.mineral_exploration_mode == "borehole"
         o = b.sr_belief.o
         
-        @info "b $(typeof(b))"  # POMCPOW.StateBelief{POWNodeBelief{MEState, MEAction, MEObservation, MineralExplorationPOMDP}}
-        @info "b.sr_belief $(typeof(b.sr_belief))"
-        @info "b.sr_belief.dist $(typeof(b.sr_belief.dist))" # CategoricalVector{Tuple{MEState, Float64}}
-        @info "b.sr_belief.particles $(typeof(b.sr_belief.particles))" # ErrorException("type POWNodeBelief has no field particles")
-        @info "b.sr_belief properties $(propertynames(b.sr_belief))" # properties (:model, :a, :o, :dist)
-        @info "b.sr_belief fieldnames $(fieldnames(typeof(b.sr_belief)))"
+        #@info "b $(typeof(b))"  # POMCPOW.StateBelief{POWNodeBelief{MEState, MEAction, MEObservation, MineralExplorationPOMDP}}
+        #@info "b.sr_belief $(typeof(b.sr_belief))"
+        #@info "b.sr_belief.dist $(typeof(b.sr_belief.dist))" # CategoricalVector{Tuple{MEState, Float64}}
+        #@info "b.sr_belief.particles $(typeof(b.sr_belief.particles))" # ErrorException("type POWNodeBelief has no field particles")
+        #@info "b.sr_belief properties $(propertynames(b.sr_belief))" # properties (:model, :a, :o, :dist)
+        #@info "b.sr_belief fieldnames $(fieldnames(typeof(b.sr_belief)))"
         s = rand(m.rng, b.sr_belief.dist)[1]
-        @info "s type $(typeof(s))" # s type MEState{Vector{Any}}
+        #@info "s type $(typeof(s))" # s type MEState{Vector{Any}}
 
         if o.stopped
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
@@ -644,23 +644,23 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
 end
 
 function get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)
-    @info "get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)"
+    #@info "get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)"
     acts = MEAction[]
     if !(current_bank_angle + m.bank_angle_intervals > m.max_bank_angle)
-        @info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle + m.bank_angle_intervals)"
+        #@info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle + m.bank_angle_intervals)"
         push!(acts, MEAction(type=:fly, change_in_bank_angle=m.bank_angle_intervals))
     end
     if !(current_bank_angle - m.bank_angle_intervals < -m.max_bank_angle)
-        @info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle - m.bank_angle_intervals)"
+        #@info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle - m.bank_angle_intervals)"
         push!(acts, MEAction(type=:fly, change_in_bank_angle=-m.bank_angle_intervals))
     end
-    @info "adding action with bank angle $(current_bank_angle)"
+    #@info "adding action with bank angle $(current_bank_angle)"
     push!(acts, MEAction(type=:fly, change_in_bank_angle=0))
     return acts
 end
 
 function POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)
-    @info "POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)"
+    #@info "POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)"
 
     if o.stopped
         return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
@@ -674,14 +674,14 @@ function POMDPs.actions(m::MineralExplorationPOMDP, o::MEObservation)
 end
 
 function mean_var(b::MEBelief)
-    @info "mean_var(b::MEBelief)"
+    #@info "mean_var(b::MEBelief)"
 
     vars = [s[1] for s in b.particles]
     mean(vars)
 end
 
 function std_var(b::MEBelief)
-    @info "std_var(b::MEBelief)"
+    #@info "std_var(b::MEBelief)"
 
     vars = [s[1] for s in b.particles]
     std(vars)
@@ -690,7 +690,7 @@ end
 
 
 function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
-    @info "Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)"
+    #@info "Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)"
     mean, var = summarize(b)
     if t == nothing
         mean_title = "belief mean"
@@ -739,7 +739,7 @@ function get_belief_plot_title(t, type)
 end
 
 function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)
-    @info "Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)"
+    #@info "Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)"
     if m.mineral_exploration_mode == "borehole"
         return Plots.plot(b, t)
     elseif m.mineral_exploration_mode == "geophysical"
@@ -757,9 +757,9 @@ function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)
         p_smooth_mean = plot_map(smooth_map_mean, smooth_mean_title)
 
         # get agent path on respective coordinate systems
-        x, y = get_agent_trajectory(b.agent_bank_angle, m)
-        x_base, y_base = normalize_agent_coordinates(x, y, m.base_grid_element_length)
-        x_smooth, y_smooth = normalize_agent_coordinates(x, y, m.smooth_grid_element_length)
+        #x, y = get_agent_trajectory(b.agent_bank_angle, m)
+        #x_base, y_base = normalize_agent_coordinates(x, y, m.base_grid_element_length)
+        #x_smooth, y_smooth = normalize_agent_coordinates(x, y, m.smooth_grid_element_length)
 
         # make std plots
         xl = (0.5, size(var, 1) + 0.5)
@@ -768,9 +768,9 @@ function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)
         #p_smooth_std = heatmap(sqrt.(smooth_map_std[:, :, 1]), title=smooth_std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=:viridis, xlims=xl, ylims=yl)
         
         # add agent path
-        add_agent_trajectory_to_plot!(p_base_mean, x_base, y_base)
-        add_agent_trajectory_to_plot!(p_base_std, x_base, y_base)
-        add_agent_trajectory_to_plot!(p_smooth_mean, x_smooth, y_smooth)
+        #add_agent_trajectory_to_plot!(p_base_mean, x_base, y_base)
+        #add_agent_trajectory_to_plot!(p_base_std, x_base, y_base)
+        #add_agent_trajectory_to_plot!(p_smooth_mean, x_smooth, y_smooth)
         #add_agent_trajectory_to_plot!(p_smooth_std, x_smooth, y_smooth)
 
         # make plots
@@ -787,7 +787,7 @@ data_kurtosis(D) = [kurtosis(D[x, y, 1:end-1]) for x in 1:size(D, 1), y in 1:siz
 
 
 function convert2data(b::MEBelief)
-    @info "convert2data(b::MEBelief)"
+    #@info "convert2data(b::MEBelief)"
     states = cat([p.ore_map[:, :, 1] for p in particles(b)]..., dims=3)
     observations = zeros(size(states)[1:2])
     for (i, a) in enumerate(b.acts)
@@ -801,7 +801,7 @@ end
 
 
 function get_input_representation(b::MEBelief)
-    @info "get_input_representation(b::MEBelief)"
+    #@info "get_input_representation(b::MEBelief)"
 
     D = convert2data(b)
     μ = mean(D[:, :, 1:end-1], dims=3)[:, :, 1]
@@ -815,7 +815,7 @@ end
 
 plot_input_representation(b::MEBelief) = plot_input_representation(get_input_representation(b))
 function plot_input_representation(B::Array{<:Real,3})
-    @info "plot_input_representation(B::Array{<:Real,3)"
+    #@info "plot_input_representation(B::Array{<:Real,3)"
     μ = B[:, :, 1]
     σ² = B[:, :, 2]
     sk = B[:, :, 3]

@@ -8,7 +8,7 @@ function plot_history(hs::Vector, n_max::Int64=10,
     title::Union{Nothing,String}=nothing,
     y_label::Union{Nothing,String}=nothing,
     box_plot::Bool=false)
-    @info "plot_history(hs::Vector, n_max::Int64=10, title::Union{Nothing, String}=nothing, y_label::Union{Nothing, String}=nothing, box_plot::Bool=false)"
+    #@info "plot_history(hs::Vector, n_max::Int64=10, title::Union{Nothing, String}=nothing, y_label::Union{Nothing, String}=nothing, box_plot::Bool=false)"
     μ = Float64[]
     σ = Float64[]
     vals_vector = Vector{Float64}[]
@@ -47,7 +47,7 @@ function plot_history(hs::Vector, n_max::Int64=10,
 end
 
 function gen_cases(ds0::MEInitStateDist, n::Int64, save_dir::Union{String,Nothing}=nothing)
-    @info "gen_cases(ds0::MEInitStateDist, n::Int64, save_dir::Union{String, Nothing}=nothing)"
+    #@info "gen_cases(ds0::MEInitStateDist, n::Int64, save_dir::Union{String, Nothing}=nothing)"
     states = MEState[]
     for i = 1:n
         push!(states, rand(ds0.rng, ds0))
@@ -63,7 +63,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     display_figs::Bool=true, save_dir::Union{Nothing,String}=nothing,
     return_final_belief=false, return_all_trees=true, collect_training_data=false,
     cmap=:viridis, verbose::Bool=true)
-    @info "start of run trial"
+    #@info "start of run trial"
 
     if verbose
         println("Initializing belief...")
@@ -128,7 +128,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     if collect_training_data
         training_data = [BetaZeroTrainingData(get_input_representation(b0), nothing, nothing)]
     end
-    @info "\n\n First timestep"
+    #@info "\n\n First timestep"
     for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=m.max_bores + 2, rng=m.rng)
         @info "\n\n timestep $t"
         discounted_return += POMDPs.discount(m)^(t - 1) * r
@@ -227,8 +227,8 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         display(vols_fig)
     end
 
-    @info "decision $last_action"
-    @info "n drills $n_drills"
+    #@info "decision $last_action"
+    #@info "n drills $n_drills"
     return_values = (discounted_return, abs_errs, rel_errs, vol_stds, n_drills, r_massive, last_action)
     if return_final_belief
         return_values = (return_values..., final_belief)
@@ -246,7 +246,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     policy::POMDPs.Policy, s0::MEState, b0::MEBelief; max_t::Int64=1000,
     display_figs::Bool=true, save_dir::Union{Nothing,String}=nothing,
     cmap=:viridis, verbose::Bool=true)
-    @info "start of run trial"
+    #@info "start of run trial"
 
     ore_fig = plot_ore_map(s0.ore_map, cmap, "base map")
     smooth_fig = plot_ore_map(s0.smooth_map, cmap, "smooth map")
@@ -322,7 +322,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
 
         if verbose
             @info "\n\n timestep $t"
-            @info "a type $(a.type)"
+            #@info "a type $(a.type)"
         end
 
         if a.type == :fly
@@ -343,7 +343,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
                 path = string(save_dir, "plane_trajectory$t.png")
                 savefig(map_and_plane, path)
             end
-            if display_figs
+            if display_figs && t % 10 == 1
                 display(b_fig_base)
                 display(b_hist)
                 display(map_and_plane)
@@ -431,21 +431,21 @@ end
 
 
 function plot_ore_map(ore_map, cmap=:viridis, title="true ore map")
-    @info "plot_ore_map(ore_map, cmap=:viridis, title=\"true ore map\")"
+    #@info "plot_ore_map(ore_map, cmap=:viridis, title=\"true ore map\")"
     xl = (0.5, size(ore_map, 1) + 0.5)
     yl = (0.5, size(ore_map, 2) + 0.5)
     return heatmap(ore_map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
 end
 
 function plot_map(map, title)
-    @info "plot_map(map, title)"
+    #@info "plot_map(map, title)"
     xl = (0.5, size(map, 1) + 0.5)
     yl = (0.5, size(map, 2) + 0.5)
     return heatmap(map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=:viridis)
 end
 
 function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)
-    @info "plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)"
+    #@info "plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)"
     xl = (0.5, size(ore_map, 1) + 0.5)
     yl = (0.5, size(ore_map, 2) + 0.5)
     s_massive = ore_map .>= massive_threshold
@@ -455,7 +455,7 @@ function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, t
 end
 
 function plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; t=0, verbose::Bool=true)
-    @info "plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; t=0, verbose::Bool=true)"
+    #@info "plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; t=0, verbose::Bool=true)"
     vols = [calc_massive(m, p) for p in b0.particles]
     mean_vols = round(mean(vols), digits=2)
     std_vols = round(std(vols), digits=2)
@@ -483,6 +483,7 @@ end
 
 ## AGENT RELATED BASE FUNCTIONS ##
 function get_agent_trajectory(bank_angle_history::Vector{Int64}, m::MineralExplorationPOMDP, dt::Float64=1.0)
+    error("this is proving unreliable")
     updates_per_timestep = m.timestep_in_seconds / dt
     pos_x, pos_y, heading = convert(Float64, m.init_pos_x), convert(Float64, m.init_pos_y), convert(Float64, m.init_heading)
 
@@ -505,6 +506,12 @@ function get_agent_trajectory(bank_angle_history::Vector{Int64}, m::MineralExplo
     to_plot_x = reduce(vcat, pos_x_outer_loop_history)
     to_plot_y = reduce(vcat, pos_y_outer_loop_history)
     return to_plot_x, to_plot_y
+end
+
+function get_agent_trajectory(s::MEState, m::MineralExplorationPOMDP)
+    x = deepcopy(s.agent_pos_x)
+    y = deepcopy(s.agent_pos_y)
+    return x, y
 end
 
 function add_agent_trajectory_to_plot!(p, x, y)
@@ -598,8 +605,8 @@ end
 
 # PLANE AND MAP COMPOUND FUNCTIONS
 function plot_smooth_map_and_plane_trajectory(s::MEState, m::MineralExplorationPOMDP)
-    x, y = get_agent_trajectory(s.agent_bank_angle, m)
-    x, y = normalize_agent_coordinates(x, y, m.smooth_grid_element_length)
+    #x, y = get_agent_trajectory(s.agent_bank_angle, m)
+    x, y = normalize_agent_coordinates(s.agent_pos_x, s.agent_pos_y, m.smooth_grid_element_length)
     p = plot_map(s.smooth_map, "geophysical map with plane trajectory")
     add_agent_trajectory_to_plot!(p, x, y)
     return p
