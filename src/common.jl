@@ -158,29 +158,29 @@ abstract type MainbodyGen end
     true_mainbody_gen::MainbodyGen = BlobNode(grid_dims=high_fidelity_dim) # high-fidelity true mainbody generator
     mainbody_gen::MainbodyGen = BlobNode(grid_dims=grid_dim)
     rng::AbstractRNG = Random.GLOBAL_RNG
-    c_exp::Float64 = 1.0
+    c_exp::Float64 = 2.0
 
-    base_grid_element_length::Float64 = convert(Float64, 25)  # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
+    base_grid_element_length::Float64 = 25.0 # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
     upscale_factor::Int = 5  # factor to upscale the grid by for smooth, higher resolution map
     smooth_grid_element_length::Float64 = base_grid_element_length / upscale_factor
     sigma::Float64 = 10  # for smoothing map with gaussian filter
-    geophysical_noise_std_dev::Float64 = 0.25
+    geophysical_noise_std_dev::Float64 = 0.0
     max_timesteps::Int = 100
     mineral_exploration_mode = "geophysical" # borehole or geophysical
     fly_cost::Float64 = 0.01
-    out_of_bounds_cost::Float64 = 0.1  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
+    out_of_bounds_cost::Float64 = 50  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
     out_of_bounds_tolerance::Int = 1 # number of grid base map grid squares the agent can be out of bounds before incurring cost
     massive_threshold::Float64 = 0.7
     strike_reward::Float64 = 1.0
     init_bank_angle::Int = 0
-    init_pos_x::Float64 = convert(Float64, 0.0)
-    init_pos_y::Float64 = convert(Float64, 0.0)
-    init_heading::Float64 = convert(Float64, 45)
-    max_bank_angle::Int = 45
-    bank_angle_intervals::Int = 5
+    init_pos_x::Float64 = 0.0
+    init_pos_y::Float64 = 0.0
+    init_heading::Float64 = (HEAD_EAST + HEAD_NORTH) / 2
+    max_bank_angle::Int = 55
+    bank_angle_intervals::Int = 10
     timestep_in_seconds::Int = 1
     observations_per_timestep::Int = 1
-    velocity::Int = 50
+    velocity::Int = 25
     extraction_cost::Float64 = 150.0
     extraction_lcb::Float64 = 0.5
     extraction_ucb::Float64 = 0.5
