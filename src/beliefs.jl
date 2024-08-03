@@ -400,7 +400,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
         bp_rock = deepcopy(b.rock_obs) # create dummy variable ahead of instantiation of MEBelief
 
         if a.type == :fly && !is_empty(o.geophysical_obs)
-            bp_geophysical_obs = append_geophysical_obs_sequence(deepcopy(b.geophysical_obs), o.geophysical_obs)
+            bp_geophysical_obs = append_geophysical_obs_sequence(deepcopy(b.geophysical_obs), deepcopy(o.geophysical_obs))
             bp_dedupe_geophysical_obs = aggregate_base_map_duplicates(deepcopy(bp_geophysical_obs))
 
             if up.m.geodist_type == GeoStatsDistribution
@@ -418,9 +418,9 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
             for p in b.particles
                 # behaviour built into o::MEObservation: plane dynamics are same as in the previous timestep for a in {mine, abandon, or stop}
                 # behaviour built into o::MEObservation: plane dynamics update if (a = fly) & (is_empty(o.geophysical_obs))
-                agent_pos_x_p = push!(deepcopy(p.agent_pos_x), o.agent_pos_x)
-                agent_pos_y_p = push!(deepcopy(p.agent_pos_y), o.agent_pos_y)
-                bank_angle_p = push!(deepcopy(p.agent_bank_angle), o.agent_bank_angle)
+                agent_pos_x_p = push!(deepcopy(p.agent_pos_x), deepcopy(o.agent_pos_x))
+                agent_pos_y_p = push!(deepcopy(p.agent_pos_y), deepcopy(o.agent_pos_y))
+                bank_angle_p = push!(deepcopy(p.agent_bank_angle), deepcopy(o.agent_bank_angle))
                 s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, o.agent_heading, agent_pos_x_p, agent_pos_y_p, bank_angle_p, p.geophysical_obs) # Update the state with new observations
                 push!(bp_particles, s)
             end    
