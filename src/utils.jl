@@ -482,7 +482,7 @@ function plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; 
 end
 
 ## AGENT RELATED BASE FUNCTIONS ##
-function get_agent_trajectory(bank_angle_history::Vector{Int64}, m::MineralExplorationPOMDP, dt::Float64=0.2)
+function get_agent_trajectory(bank_angle_history::Vector{Int64}, m::MineralExplorationPOMDP, dt::Float64=1.0)
     updates_per_timestep = m.timestep_in_seconds / dt
     pos_x, pos_y, heading = convert(Float64, m.init_pos_x), convert(Float64, m.init_pos_y), convert(Float64, m.init_heading)
 
@@ -508,6 +508,7 @@ function get_agent_trajectory(bank_angle_history::Vector{Int64}, m::MineralExplo
 end
 
 function add_agent_trajectory_to_plot!(p, x, y)
+    # when parsed, x and y correspond to x being east-west and y being north-south
     plot!(p, x, y, color="red", lw=2, label=:none)
 end
 

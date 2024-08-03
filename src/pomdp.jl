@@ -480,7 +480,7 @@ function geophysical_obs(x::Int64, y::Int64, smooth_map::Array{Float64}, std_dev
         error("y coordinate out of bounds")
     else
         #plot_ore_map(smooth_map, title="smooth map in geophysical obs")
-        noiseless_geo_obs = smooth_map[x, y, 1]
+        noiseless_geo_obs = smooth_map[y, x, 1]
         if std_dev == 0
             @info "returning noiseless obs $(noiseless_geo_obs)"
             return noiseless_geo_obs
@@ -545,8 +545,8 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
             @info "smooth map coordinates $(x_smooth_map), $(y_smooth_map)"
             obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
             tmp_go.reading = push!(tmp_go.reading, obs)
-            tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[x_smooth_map y_smooth_map], 2, 1))
-            tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[x_base_map y_base_map], 2, 1))
+            tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[y_smooth_map x_smooth_map], 2, 1))
+            tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[y_base_map x_base_map], 2, 1))
         else
             @info "plane out of region"
         end
