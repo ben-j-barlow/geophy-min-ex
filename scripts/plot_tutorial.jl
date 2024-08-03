@@ -21,10 +21,16 @@ m = MineralExplorationPOMDP(
     c_exp=C_EXP,
     mainbody_gen=BlobNode(grid_dims=grid_dims),
     true_mainbody_gen=BlobNode(grid_dims=grid_dims),
-    timestep_in_seconds=2,
+    timestep_in_seconds=1,
     observations_per_timestep=1,
-    velocity=50,
-    geophysical_noise_std_dev=0
+    velocity=20,
+    geophysical_noise_std_dev=0,
+    base_grid_element_length=4.0,
+    upscale_factor=4,
+    sigma=20,
+    init_pos_x=80, # coord 20
+    init_pos_y=40, # coord 10
+    init_heading=0.0
 )
 
 ds0 = POMDPs.initialstate(m)
@@ -46,10 +52,10 @@ solver = POMCPOWSolver(
     criterion=POMCPOW.MaxUCB(m.c_exp),
     final_criterion=POMCPOW.MaxQ(),
     estimate_value=leaf_estimation,
-    tree_in_info=false,
+    tree_in_info=false
 )
 planner = POMDPs.solve(solver, m)
-discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=30, save_dir="./data/sandbox/tmp");
+discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=20, save_dir="./data/sandbox/tmp");
 
 #using D3Trees
 #tree_1 = trees[1]
