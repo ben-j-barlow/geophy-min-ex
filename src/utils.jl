@@ -130,7 +130,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     end
     #@info "\n\n First timestep"
     for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=m.max_bores + 2, rng=m.rng)
-        @info "\n\n timestep $t"
+        @info "timestep $t"
         discounted_return += POMDPs.discount(m)^(t - 1) * r
         last_action = a.type
 
@@ -321,11 +321,11 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         map_and_plane = plot_smooth_map_and_plane_trajectory(sp, m)
 
         if verbose
-            @info "\n\n timestep $t"
+            @info "timestep $t"
             #@info "a type $(a.type)"
         end
 
-        if a.type == :fly
+        if a.type == :fly 
             n_flys += 1
             #ae = mean(abs.(vols .- r_massive))
             #re = mean(vols .- r_massive)
@@ -333,7 +333,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             #push!(rel_errs, re)
             #push!(vol_stds, std_vols)
 
-            if isa(save_dir, String)
+            if isa(save_dir, String) && t % 10 == 1
                 path = string(save_dir, "b$t.png")
                 savefig(b_fig_base, path)
 
@@ -517,6 +517,7 @@ end
 function add_agent_trajectory_to_plot!(p, x, y)
     # when parsed, x and y correspond to x being east-west and y being north-south
     plot!(p, x, y, color="red", lw=2, label=:none)
+    annotate!(x[1], y[1], Plots.text("S", 10, :black, rotation=0))
 end
 
 function normalize_agent_coordinates(x::Vector{Float64}, y::Vector{Float64}, grid_element_length::Float64, return_continuous::Bool=true)
