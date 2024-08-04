@@ -480,9 +480,9 @@ function geophysical_obs(x::Int64, y::Int64, smooth_map::Array{Float64}, std_dev
         error("y coordinate out of bounds")
     else
         #plot_ore_map(smooth_map, title="smooth map in geophysical obs")
-        noiseless_geo_obs = smooth_map[y, x, 1]
-        if std_dev == 0
-            #@info "returning noiseless obs $(noiseless_geo_obs)"
+        noiseless_geo_obs = deepcopy(smooth_map[y, x, 1])
+        if std_dev == 0.0
+            #@info "returning noiseless obs $(noiseless_geo_obs) at x $(x) and y $(y)"
             return noiseless_geo_obs
         end
         noise = rand(Normal(0, std_dev), 1)[1]
@@ -544,9 +544,9 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
             # generate observation
             #@info "smooth map coordinates $(x_smooth_map), $(y_smooth_map)"
             obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
-            tmp_go.reading = push!(tmp_go.reading, obs)
-            tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[y_smooth_map x_smooth_map], 2, 1))
-            tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[y_base_map x_base_map], 2, 1))
+            tmp_go.reading = push!(tmp_go.reading, deepcopy(obs))
+            tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, deepcopy(reshape(Int64[y_smooth_map x_smooth_map], 2, 1)))
+            tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, deepcopy(reshape(Int64[y_base_map x_base_map], 2, 1)))
         else
             #@info "plane out of region"
         end
@@ -557,9 +557,9 @@ end
 
 
 function append_geophysical_obs_sequence(history::GeophysicalObservations, new_obs::GeophysicalObservations)
-    history.reading = vcat(history.reading, new_obs.reading)
-    history.base_map_coordinates = hcat(history.base_map_coordinates, new_obs.base_map_coordinates)
-    history.smooth_map_coordinates = hcat(history.smooth_map_coordinates, new_obs.smooth_map_coordinates)
+    vcat(history.reading, new_obs.reading)
+    hcat(history.base_map_coordinates, new_obs.base_map_coordinates)
+    hcat(history.smooth_map_coordinates, new_obs.smooth_map_coordinates)
     return history
 end
 
