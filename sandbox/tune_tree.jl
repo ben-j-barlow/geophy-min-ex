@@ -1,17 +1,20 @@
 using Revise
 
 using POMDPs
-using POMDPSimulators
 using POMCPOW
 using Plots
 using POMDPModelTools
-using ParticleFilters
-using Statistics
 using Random
 
 using MineralExploration
 
-C_EXP = 2
+# key parameters are
+# C_EXP: exploration constant
+# alpha
+# k
+
+
+C_EXP = 100
 
 N_PARTICLES = 1000
 NOISE_FOR_PERTURBATION = 2.0
@@ -45,9 +48,9 @@ s0 = rand(ds0);
 
 # prepare POMCPOW
 solver = POMCPOWSolver(
-    tree_queries=4000,
-    k_observation=2.0,
-    alpha_observation=0.1,
+    tree_queries=10000,
+    k_observation=2,
+    alpha_observation=0.05,
     max_depth=5,
     check_repeat_obs=true,
     check_repeat_act=true,
@@ -62,10 +65,11 @@ solver = POMCPOWSolver(
 )
 planner = POMDPs.solve(solver, m)
 
+#@info "ground truth s.smooth_map[80,75,1] is $(s0.smooth_map[80,75,1])"
+#a, ai = action_info(planner, b0);
 
-plot_map(s0.ore_map, "ore map")
 
-a, ai = action_info(planner, b0);
+#using D3Trees
+#inbrowser(D3Tree(planner.tree, init_expand=1), "safari")
 
-using D3Trees
-inbrowser(D3Tree(planner.tree, init_expand=1), "safari")
+discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=80);

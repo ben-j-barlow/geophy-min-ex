@@ -73,6 +73,7 @@ println("Starting Simulations...")
 data = POMDPSimulators.run_parallel(queue, show_progress=true)
 println("Simulations Complete!")
 JLD.save("./data/POMCPOW_test_4.jld", "results", data)
-
+# extracting speicifc data 
+# https://juliapomdp.github.io/POMDPs.jl/stable/POMDPTools/simulators/#Specifying-information-to-be-recordedp
 data[!, :reward]
 data[!, :massive_ore]

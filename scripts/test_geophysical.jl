@@ -38,8 +38,8 @@ solver = POMCPOWSolver(
     tree_in_info=true,
 )
 
-START_X = [30, 30, 25*40, 25*25]
-START_Y = [30, 25*50-30, 25*40, 25*25]
+START_X = [30.0, 30.0, 25.1*40.1, 25.1*25.1]
+START_Y = [30.0, 25.1*50.1-30, 25.1*40.1, 25,1*25.1]
 INIT_HEADING = [HEAD_NORTH, HEAD_SOUTH, HEAD_EAST, HEAD_WEST]
 
 path_map = []
@@ -50,11 +50,9 @@ h = nothing
 for i in 1:4
     @info "iteration $i"
     m = MineralExplorationPOMDP(
-        c_exp=C_EXP,
-        sigma=20,
-        init_heading=convert(Float64, 0),
-        init_pos_x=convert(Float64, START_X[i]),
-        init_pos_y=convert(Float64, START_Y[i]),
+        init_heading=INIT_HEADING[i],
+        init_pos_x=START_X[i],
+        init_pos_y=START_Y[i],
         out_of_bounds_cost=50,
         geophysical_noise_std_dev=convert(Float64, 0.0),
         observations_per_timestep=1,
