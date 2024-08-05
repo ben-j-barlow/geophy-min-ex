@@ -243,7 +243,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
 end
 
 function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
-    policy::POMDPs.Policy, s0::MEState, b0::MEBelief; max_t::Int64=1000,
+    policy::POMDPs.Policy, s0::MEState, b0::MEBelief; max_t::Int64=1000, output_t::Int64=10,
     display_figs::Bool=true, save_dir::Union{Nothing,String}=nothing,
     cmap=:viridis, verbose::Bool=true, return_all_trees::Bool=false)
     #@info "start of run trial"
@@ -324,7 +324,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
 
         if verbose
             @info "timestep $t"
-            #@info "a type $(a.type)"
+            @info "a type $(a.change_in_bank_angle)"
         end
 
         if a.type == :fly 
@@ -334,8 +334,8 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             #push!(abs_errs, ae)
             #push!(rel_errs, re)
             #push!(vol_stds, std_vols)
-            if t % 10 == 1
-                b_fig_base = plot(bp, m, t)
+            if t % output_t == 0 || t == 1
+                b_fig_base = plot(bp, m, sp, t)
                 b_hist, vols, mean_vols, std_vols = plot_volume(m, bp, r_massive; t=t, verbose=false)
                 map_and_plane = plot_smooth_map_and_plane_trajectory(sp, m)
                 
@@ -359,6 +359,8 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
                 empty!(b_fig_base)
                 empty!(b_hist)
                 empty!(map_and_plane)
+
+                GC.gc()
             end
             #b_mean, b_std = MineralExploration.summarize(bp)
             if isa(save_dir, String)

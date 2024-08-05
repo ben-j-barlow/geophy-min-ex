@@ -12,7 +12,8 @@ using POMDPPolicies
 
 N_PARTICLES = 1000
 NOISE_FOR_PERTURBATION = 2.0
-C_EXP = 2
+C_EXP = 100
+GET_TREES = false
 
 SAVE_DIR = "./data/sandbox/tmp" #instead of +string(variable) OR $(var1+var2)
 !isdir(SAVE_DIR) && mkdir(SAVE_DIR)
@@ -36,7 +37,7 @@ m = MineralExplorationPOMDP(
     init_pos_y=400,
     bank_angle_intervals=10,
     max_bank_angle=55,
-    velocity=25,
+    velocity=70,
     base_grid_element_length=25.0
 )
 
@@ -51,15 +52,12 @@ s0 = rand(ds0; truth=true) #Checked
 up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION) #Checked
 b0 = POMDPs.initialize_belief(up, ds0) #Checked
 
-tree_queries = [3, 5, 10, 100, 1_000, 2000, 5000, 10_000]
-i_tree_queries = 6
-
 solver = POMCPOWSolver(
-    tree_queries=4000,
+    tree_queries=10000,
     k_observation=2.0,
     alpha_observation=0.1,
     max_depth=5,
-    check_repeat_obs=true,
+    check_repeat_obs=false,
     check_repeat_act=true,
     enable_action_pw=false,
     #next_action=nothing,
@@ -68,13 +66,12 @@ solver = POMCPOWSolver(
     criterion=POMCPOW.MaxUCB(m.c_exp),
     final_criterion=POMCPOW.MaxQ(),
     estimate_value=leaf_estimation,
-    tree_in_info=true,
+    tree_in_info=GET_TREES,
 )
 planner = POMDPs.solve(solver, m)
 
-discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=20);
+discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=150, output_t=3, return_all_trees=GET_TREES);
 
-#plot_smooth_map_and_plane_trajectory(final_state, m)
 
 
 #plot(final_belief)
