@@ -208,7 +208,8 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     end
 
     if a ∉ POMDPs.actions(m, s)  # has no check on confidence when stop is chosen in geophysical case
-        error("Invalid Action from state")
+        _ = POMDPs.actions(m, s, verbose=true)
+        error("Invalid Action $(a.change_in_bank_angle) from state with current_bank_angle $(last(s.agent_bank_angle))")
     end
     stopped = s.stopped
     decided = s.decided
@@ -336,8 +337,10 @@ function POMDPs.actions(m::MineralExplorationPOMDP)
     return actions
 end
 
-function POMDPs.actions(m::MineralExplorationPOMDP, s::MEState)
-    #@info "POMDPs.actions(m::MineralExplorationPOMDP, s::MEState)"
+function POMDPs.actions(m::MineralExplorationPOMDP, s::MEState; verbose::Bool=false)
+    if verbose
+        @info "POMDPs.actions(m::MineralExplorationPOMDP, s::MEState)"
+    end
     if s.decided
         return MEAction[]
     elseif s.stopped
@@ -380,7 +383,11 @@ function POMDPs.actions(m::MineralExplorationPOMDP, s::MEState)
             return collect(action_set)
         elseif m.mineral_exploration_mode == "geophysical"
             #@info "no use of confidence when checking if stop is a permitted action"
-            acts = get_flying_actions(m, last(s.agent_bank_angle))
+            
+            acts = get_flying_actions(m, last(s.agent_bank_angle), verbose=verbose)
+            if verbose
+                @info "actions: add stop"
+            end
             push!(acts, MEAction(type=:stop))
             return collect(acts)
         else

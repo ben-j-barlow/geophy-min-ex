@@ -643,18 +643,28 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
     end
 end
 
-function get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)
-    #@info "get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)"
+function get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int; verbose::Bool=false)
     acts = MEAction[]
+    if verbose
+        @info "get_flying_actions(m::MineralExplorationPOMDP, current_bank_angle::Int)"
+        @info "current_bank_angle $(current_bank_angle); intervals $(m.bank_angle_intervals); max $(m.max_bank_angle)"
+    end
     if !(current_bank_angle + m.bank_angle_intervals > m.max_bank_angle)
         #@info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle + m.bank_angle_intervals)"
+        if verbose
+            @info "add action $(m.bank_angle_intervals)"
+        end
         push!(acts, MEAction(type=:fly, change_in_bank_angle=m.bank_angle_intervals))
     end
     if !(current_bank_angle - m.bank_angle_intervals < -m.max_bank_angle)
-        #@info "bank angle is $(current_bank_angle) so adding action with bank angle $(current_bank_angle - m.bank_angle_intervals)"
+        if verbose
+            @info "add action $(-m.bank_angle_intervals)"
+        end
         push!(acts, MEAction(type=:fly, change_in_bank_angle=-m.bank_angle_intervals))
     end
-    #@info "adding action with bank angle $(current_bank_angle)"
+    if verbose
+        @info "add action 0"
+    end
     push!(acts, MEAction(type=:fly, change_in_bank_angle=0))
     return acts
 end
@@ -738,7 +748,7 @@ function get_belief_plot_title(t, type)
     return mean_title, std_title
 end
 
-function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)
+function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, s::MEState, t=nothing)
     #@info "Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)"
     if m.mineral_exploration_mode == "borehole"
         return Plots.plot(b, t)
@@ -757,8 +767,8 @@ function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)
         p_smooth_mean = plot_map(smooth_map_mean, smooth_mean_title)
 
         # get agent path on respective coordinate systems
-        #x, y = get_agent_trajectory(b.agent_bank_angle, m)
-        #x_base, y_base = normalize_agent_coordinates(x, y, m.base_grid_element_length)
+        x, y = s.agent_pos_x, s.agent_pos_y # get_agent_trajectory(b.agent_bank_angle, m)
+        x_base, y_base = normalize_agent_coordinates(x, y, m.base_grid_element_length)
         #x_smooth, y_smooth = normalize_agent_coordinates(x, y, m.smooth_grid_element_length)
 
         # make std plots
@@ -768,8 +778,8 @@ function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)
         #p_smooth_std = heatmap(sqrt.(smooth_map_std[:, :, 1]), title=smooth_std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=:viridis, xlims=xl, ylims=yl)
         
         # add agent path
-        #add_agent_trajectory_to_plot!(p_base_mean, x_base, y_base)
-        #add_agent_trajectory_to_plot!(p_base_std, x_base, y_base)
+        add_agent_trajectory_to_plot!(p_base_mean, x_base, y_base)
+        add_agent_trajectory_to_plot!(p_base_std, x_base, y_base)
         #add_agent_trajectory_to_plot!(p_smooth_mean, x_smooth, y_smooth)
         #add_agent_trajectory_to_plot!(p_smooth_std, x_smooth, y_smooth)
 
