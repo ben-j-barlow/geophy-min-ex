@@ -557,11 +557,12 @@ end
 
 
 function append_geophysical_obs_sequence(history::GeophysicalObservations, new_obs::GeophysicalObservations)
-    vcat(history.reading, new_obs.reading)
-    hcat(history.base_map_coordinates, new_obs.base_map_coordinates)
-    hcat(history.smooth_map_coordinates, new_obs.smooth_map_coordinates)
-    return history
+    combined_reading = vcat(history.reading, new_obs.reading)
+    combined_base_map_coordinates = hcat(history.base_map_coordinates, new_obs.base_map_coordinates)
+    combined_smooth_map_coordinates = hcat(history.smooth_map_coordinates, new_obs.smooth_map_coordinates)
+    return GeophysicalObservations(combined_reading, combined_smooth_map_coordinates, combined_base_map_coordinates)
 end
+
 
 function check_plane_within_region(m::MineralExplorationPOMDP, pos_x::Float64, pos_y::Float64, tolerance::Int=0)
     # tolerance - number of grid squares that the plane can be outside the region

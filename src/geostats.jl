@@ -61,11 +61,6 @@ function update!(d::GeoStatsDistribution, o::Union{RockObservations, Geophysical
 
     var = :ore
     varparams = d.lu_params.lugs.vparams[:ore]
-    @info "pdata $(typeof(pdata))"
-    @info "pdomain $(typeof(pdomain))"
-    @info "var $(typeof(var))"
-    @info "varparams.mapping $(typeof(varparams.mapping))"
-
     vmapping = map(pdata, pdomain, (var,), varparams.mapping)[var]
     dlocs = Int[]
     for (loc, dloc) in vmapping

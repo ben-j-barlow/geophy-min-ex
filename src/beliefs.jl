@@ -400,8 +400,8 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
         bp_rock = deepcopy(b.rock_obs) # create dummy variable ahead of instantiation of MEBelief
 
         if a.type == :fly && !is_empty(o.geophysical_obs)
-            bp_geophysical_obs = append_geophysical_obs_sequence(deepcopy(b.geophysical_obs), deepcopy(o.geophysical_obs))
-            bp_dedupe_geophysical_obs = aggregate_base_map_duplicates(deepcopy(bp_geophysical_obs))
+            bp_geophysical_obs = append_geophysical_obs_sequence(b.geophysical_obs, o.geophysical_obs)            
+            bp_dedupe_geophysical_obs = aggregate_base_map_duplicates(bp_geophysical_obs)
 
             if up.m.geodist_type == GeoStatsDistribution
                 bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock), bp_dedupe_geophysical_obs,
