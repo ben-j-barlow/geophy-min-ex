@@ -72,7 +72,7 @@ solver = POMCPOWSolver(
 )
 planner = POMDPs.solve(solver, m)
 
-discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=100);
+discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=20);
 
 #plot_smooth_map_and_plane_trajectory(final_state, m)
 

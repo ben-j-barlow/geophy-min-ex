@@ -245,7 +245,7 @@ end
 function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     policy::POMDPs.Policy, s0::MEState, b0::MEBelief; max_t::Int64=1000,
     display_figs::Bool=true, save_dir::Union{Nothing,String}=nothing,
-    cmap=:viridis, verbose::Bool=true)
+    cmap=:viridis, verbose::Bool=true, return_all_trees::Bool=false)
     #@info "start of run trial"
 
     ore_fig = plot_ore_map(s0.ore_map, cmap, "base map")
@@ -286,18 +286,24 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         display(b0_hist)
     end
 
+    empty!(ore_fig)
+    empty!(smooth_fig)
+    empty!(mass_fig)
+    empty!(b0_fig)
+    empty!(b0_hist)
+
     # summarize built from ore map (not smooth map)
     b_mean, b_std = MineralExploration.summarize(b0)
-    if isa(save_dir, String)
-        path = string(save_dir, "belief_mean.txt")
-        open(path, "w") do io
-            writedlm(io, reshape(b_mean, :, 1))
-        end
-        path = string(save_dir, "belief_std.txt")
-        open(path, "w") do io
-            writedlm(io, reshape(b_std, :, 1))
-        end
-    end
+    #if isa(save_dir, String)
+    #    path = string(save_dir, "belief_mean.txt")
+    #    open(path, "w") do io
+    #        writedlm(io, reshape(b_mean, :, 1))
+    #    end
+    #    path = string(save_dir, "belief_std.txt")
+    #    open(path, "w") do io
+    #        writedlm(io, reshape(b_std, :, 1))
+    #    end
+    #end
 
     last_action = :fly
     n_flys = 0
@@ -316,10 +322,6 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         discounted_return += POMDPs.discount(m)^(t - 1) * r
         last_action = a.type
 
-        b_fig_base = plot(bp, m, t)
-        b_hist, vols, mean_vols, std_vols = plot_volume(m, bp, r_massive; t=t, verbose=false)
-        map_and_plane = plot_smooth_map_and_plane_trajectory(sp, m)
-
         if verbose
             @info "timestep $t"
             #@info "a type $(a.type)"
@@ -332,21 +334,31 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             #push!(abs_errs, ae)
             #push!(rel_errs, re)
             #push!(vol_stds, std_vols)
+            if t % 10 == 1
+                b_fig_base = plot(bp, m, t)
+                b_hist, vols, mean_vols, std_vols = plot_volume(m, bp, r_massive; t=t, verbose=false)
+                map_and_plane = plot_smooth_map_and_plane_trajectory(sp, m)
+                
+                if isa(save_dir, String)
+                    path = string(save_dir, "b$t.png")
+                    savefig(b_fig_base, path)
 
-            if isa(save_dir, String) && t % 10 == 1
-                path = string(save_dir, "b$t.png")
-                savefig(b_fig_base, path)
+                    path = string(save_dir, "b$(t)_hist.png")
+                    savefig(b_hist, path)
 
-                path = string(save_dir, "b$(t)_hist.png")
-                savefig(b_hist, path)
+                    path = string(save_dir, "plane_trajectory$t.png")
+                    savefig(map_and_plane, path)
+                end
+                
+                if display_figs
+                    display(b_fig_base)
+                    display(b_hist)
+                    display(map_and_plane)
+                end
 
-                path = string(save_dir, "plane_trajectory$t.png")
-                savefig(map_and_plane, path)
-            end
-            if display_figs && t % 10 == 1
-                display(b_fig_base)
-                display(b_hist)
-                display(map_and_plane)
+                empty!(b_fig_base)
+                empty!(b_hist)
+                empty!(map_and_plane)
             end
             #b_mean, b_std = MineralExploration.summarize(bp)
             if isa(save_dir, String)
@@ -360,10 +372,13 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             #    end
             end
         end
+
         final_belief = bp
         final_state = sp
         
-        push!(trees, deepcopy(policy.tree))
+        if return_all_trees
+            push!(trees, deepcopy(policy.tree))
+        end
     end
     if verbose
         println("Discounted Return: $discounted_return")
