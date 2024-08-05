@@ -146,7 +146,7 @@ function reweight(up::MEBeliefUpdater, geostats::GeoDist, particles::Vector, geo
     ws = Float64[]
     
     # dedupe observations from same square
-    geo_obs_dedupe = aggregate_base_map_duplicates(deepcopy(geophysical_obs))
+    geo_obs_dedupe = aggregate_base_map_duplicates(geophysical_obs)
     coords = geo_obs_dedupe.base_map_coordinates
 
     n = size(coords)[2]
@@ -748,7 +748,7 @@ function get_belief_plot_title(t, type)
     return mean_title, std_title
 end
 
-function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, s::MEState, t=nothing)
+function Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, s::MEState; t=nothing)
     #@info "Plots.plot(b::MEBelief, m::MineralExplorationPOMDP, t=nothing)"
     if m.mineral_exploration_mode == "borehole"
         return Plots.plot(b, t)
