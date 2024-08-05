@@ -622,10 +622,20 @@ function get_smooth_map_coordinates(x::Float64, y::Float64, m::MineralExploratio
 end
 
 # PLANE AND MAP COMPOUND FUNCTIONS
-function plot_smooth_map_and_plane_trajectory(s::MEState, m::MineralExplorationPOMDP)
+function plot_smooth_map_and_plane_trajectory(s::MEState, m::MineralExplorationPOMDP; t=nothing)
     #x, y = get_agent_trajectory(s.agent_bank_angle, m)
     x, y = normalize_agent_coordinates(s.agent_pos_x, s.agent_pos_y, m.smooth_grid_element_length)
-    p = plot_map(s.smooth_map, "geophysical map with plane trajectory")
+    title = t == nothing ? "geophysical map with plane trajectory" : "geophysical map with plane trajectory t=$t"
+    p = plot_map(s.smooth_map, title)
+    add_agent_trajectory_to_plot!(p, x, y)
+    return p
+end
+
+function plot_base_map_and_plane_trajectory(s::MEState, m::MineralExplorationPOMDP; t=nothing)
+    #x, y = get_agent_trajectory(s.agent_bank_angle, m)
+    x, y = normalize_agent_coordinates(s.agent_pos_x, s.agent_pos_y, m.base_grid_element_length)
+    title = t == nothing ? "base map with plane trajectory" : "base map with plane trajectory t=$t"
+    p = plot_map(s.ore_map, title)
     add_agent_trajectory_to_plot!(p, x, y)
     return p
 end

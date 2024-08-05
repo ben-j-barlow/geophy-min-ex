@@ -127,6 +127,7 @@ export
         add_agent_trajectory_to_plot!,
         get_agent_trajectory,
         plot_smooth_map_and_plane_trajectory,
+        plot_base_map_and_plane_trajectory,
         get_base_map_coordinates,
         get_smooth_map_coordinates,
         plot_base_map_at_observation_locations,
