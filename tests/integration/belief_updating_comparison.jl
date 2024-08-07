@@ -8,12 +8,12 @@ using POMDPModelTools
 
 include("../helpers.jl")
 
-save_dir = "./data/belief_fly_line_comparison_circle/"
+save_dir = "./data/belief_fly_line_comparison_noise_dot5/"
 !isdir(save_dir) && mkdir(save_dir)
 
 # constants
 N_PARTICLES = 1000
-NOISE_FOR_PERTURBATION = 2.0
+NOISE_FOR_PERTURBATION = 0.1
 
 # CIRCLE TEST
 #init_pos_x=30 * 25.0, # cell 31
@@ -24,9 +24,9 @@ NOISE_FOR_PERTURBATION = 2.0
 # setup
 m = MineralExplorationPOMDP(
     init_pos_x=30 * 25.0, # cell 31
-    init_pos_y=20 * 25.0, # cell 0 (outside grid so first flight will be to cell 1)
-    init_heading=HEAD_EAST,
-    init_bank_angle=15,
+    init_pos_y=20, # cell 0 (outside grid so first flight will be to cell 1)
+    init_heading=HEAD_NORTH,
+    init_bank_angle=0,
     base_grid_element_length=25,
     velocity=25,
     out_of_bounds_cost=0.5,
