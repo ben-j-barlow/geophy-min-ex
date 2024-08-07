@@ -348,6 +348,8 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
                     open(path, "a") do io
                         println(io, "Vols at time $t: $(mn) ± $(std)")
                     end
+
+                    @info "Vols at time 0: $mn ± $std"
                 end
 
                 if display_figs
