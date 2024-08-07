@@ -15,11 +15,21 @@ N_PARTICLES = 1000
 NOISE_FOR_PERTURBATION = 0.1
 # noise
 # 10 - belief didnt really converge
-C_EXP = 125
-GET_TREES = true
 
-SAVE_DIR = "./data/geophys_trial" #instead of +string(variable) OR $(var1+var2)
-!isdir(SAVE_DIR) && mkdir(SAVE_DIR)
+C_EXP = 125
+GET_TREES = false
+
+SEED = 42
+
+SAVE_DIR = "./data/geophys_trial$(SEED)/" 
+
+
+if isdir(SAVE_DIR)
+    rm(SAVE_DIR; recursive=true)
+    #error("directory already exists")
+end 
+
+mkdir(SAVE_DIR)
 
 #io = MineralExploration.prepare_logger()
 
@@ -35,8 +45,8 @@ m = MineralExplorationPOMDP(
     geophysical_noise_std_dev=0.0,
     observations_per_timestep=1,
     timestep_in_seconds=1,
-    init_pos_x=30 * 25,
-    init_pos_y=0,
+    init_pos_x=25 * 25,
+    init_pos_y=25 * 25,
     bank_angle_intervals=15,
     max_bank_angle=55,
     velocity=25,
@@ -48,7 +58,7 @@ m = MineralExplorationPOMDP(
 
 ds0 = POMDPs.initialstate(m)
 
-Random.seed!(42)
+Random.seed!(SEED)
 s0 = rand(ds0; truth=true) #Checked
 
 # get min amd max value of ore map
@@ -74,15 +84,15 @@ solver = POMCPOWSolver(
     criterion=POMCPOW.MaxUCB(m.c_exp),
     final_criterion=POMCPOW.MaxQ(),
     estimate_value=leaf_estimation,
-    tree_in_info=GET_TREES,
+    tree_in_info=false,
 )
 planner = POMDPs.solve(solver, m)
 
-discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=3, output_t=1, return_all_trees=GET_TREES);
+discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=100, output_t=5, save_dir=SAVE_DIR, return_all_trees=GET_TREES);
 
 plot_base_map_and_plane_trajectory(final_state, m)
 
-for i in 1:3
-    inbrowser(D3Tree(trees[i], init_expand=1), "safari")
-    @info ""
-end
+#for i in 1:3
+#    inbrowser(D3Tree(trees[i], init_expand=1), "safari")
+#    @info ""
+#end

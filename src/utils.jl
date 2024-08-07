@@ -258,53 +258,58 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     # plot initial belief and histogram
     b0_fig = plot(b0; cmap=cmap) #TODO: add flying lines
     b0_hist, vols, mean_vols, std_vols = plot_volume(m, b0, r_massive; t=0, verbose=verbose)
-
+    
+    
+    b0_plot = plot(b0, m, s0, t=0)
+    ore_map_plot = plot_map(s0.ore_map, "ore map")
+    smooth_map_plot = plot_map(s0.smooth_map, "smooth map")
+    mass_map_plot, r_massive = plot_mass_map(s0.ore_map, m.massive_threshold, :viridis; truth=true)
+    b0_hist, _, mn, std = plot_volume(m, b0, r_massive, t=0, verbose=false)
+    @info "Vols at time 0: $mn ± $std"
+        
     if isa(save_dir, String)
         save_dir = joinpath(abspath(save_dir), "")
+    
+        # initial belief
+        savefig(b0_plot, string(save_dir, "0b.png"))
+    
+        # ore map
+        savefig(ore_map_plot, string(save_dir, "0ore_map.png"))
+    
+        # smooth map
+        savefig(smooth_map_plot, string(save_dir, "0smooth_map.png"))
+    
+        # mass map
+        savefig(mass_map_plot, string(save_dir, "0mass_map.png"))
+    
+        # initial volume
+        savefig(b0_hist, string(save_dir, "0volume.png"))
+    
+        open(string(save_dir, "belief_mean.txt"), "w") do io
+            println(io, "Vols at time 0: $(mn) ± $(std)")
+        end
 
-        path = string(save_dir, "base_map.png")
-        savefig(ore_fig, path)
-
-        path = string(save_dir, "smooth_map.png")
-        savefig(smooth_fig, path)
-
-        path = string(save_dir, "mass_map.png")
-        savefig(mass_fig, path)
-
-        path = string(save_dir, "b0.png")
-        savefig(b0_fig, path)
-
-        path = string(save_dir, "b0_hist.png")
-        savefig(b0_hist, path)
+        open(string(save_dir, "config.txt"), "w") do io
+            println(io, "Noise for perturbation: $(up.noise)")
+            println(io, "Number of particles:    $(up.n)")
+            println(io, "Exploration constant:   $(m.c_exp)")
+        end
     end
-
+    
     if display_figs
-        display(ore_fig)
-        display(smooth_fig)
-        display(mass_fig)
-        display(b0_fig)
+        display(ore_map_plot)
+        display(smooth_map_plot)
+        display(mass_map_plot)
+        display(b0_plot)
         display(b0_hist)
     end
-
-    empty!(ore_fig)
-    empty!(smooth_fig)
-    empty!(mass_fig)
-    empty!(b0_fig)
+    
+    empty!(ore_map_plot)
+    empty!(smooth_map_plot)
+    empty!(mass_map_plot)
+    empty!(b0_plot)
     empty!(b0_hist)
-
-    # summarize built from ore map (not smooth map)
-    b_mean, b_std = MineralExploration.summarize(b0)
-    #if isa(save_dir, String)
-    #    path = string(save_dir, "belief_mean.txt")
-    #    open(path, "w") do io
-    #        writedlm(io, reshape(b_mean, :, 1))
-    #    end
-    #    path = string(save_dir, "belief_std.txt")
-    #    open(path, "w") do io
-    #        writedlm(io, reshape(b_std, :, 1))
-    #    end
-    #end
-
+    
     last_action = :fly
     n_flys = 0
     discounted_return = 0.0
@@ -316,40 +321,35 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     final_belief = nothing
     final_state = nothing
     trees = []
-    
+
     for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=max_t, rng=m.rng)
-        
+
         discounted_return += POMDPs.discount(m)^(t - 1) * r
         last_action = a.type
 
-        if verbose
-            @info "timestep $t"
-            @info "a type $(a.change_in_bank_angle)"
-        end
-
-        if a.type == :fly 
+        if a.type == :fly
             n_flys += 1
-            #ae = mean(abs.(vols .- r_massive))
-            #re = mean(vols .- r_massive)
-            #push!(abs_errs, ae)
-            #push!(rel_errs, re)
-            #push!(vol_stds, std_vols)
             if t % output_t == 0 || t == 1
                 b_fig_base = plot(bp, m, sp, t=t)
-                b_hist, vols, mean_vols, std_vols = plot_volume(m, bp, r_massive; t=t, verbose=false)
+                b_hist, vols, mn, std = plot_volume(m, bp, r_massive; t=t, verbose=false)
                 map_and_plane = plot_base_map_and_plane_trajectory(sp, m, t=t)
-                
+
                 if isa(save_dir, String)
-                    path = string(save_dir, "b$t.png")
+                    path = string(save_dir, "$(t)b.png")
                     savefig(b_fig_base, path)
 
-                    path = string(save_dir, "b$(t)_hist.png")
+                    path = string(save_dir, "$(t)volume.png")
                     savefig(b_hist, path)
 
-                    path = string(save_dir, "plane_trajectory$t.png")
+                    path = string(save_dir, "$(t)trajectory.png")
                     savefig(map_and_plane, path)
+
+                    path = string(save_dir, "belief_mean.txt")
+                    open(path, "a") do io
+                        println(io, "Vols at time $t: $(mn) ± $(std)")
+                    end
                 end
-                
+
                 if display_figs
                     display(b_fig_base)
                     display(b_hist)
@@ -359,89 +359,32 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
                 empty!(b_fig_base)
                 empty!(b_hist)
                 empty!(map_and_plane)
+            end
 
+            if t % 20 == 0
                 GC.gc()
             end
-            #b_mean, b_std = MineralExploration.summarize(bp)
-            if isa(save_dir, String)
-            #    path = string(save_dir, "belief_mean.txt")
-            #    open(path, "a") do io
-            #        writedlm(io, reshape(b_mean, :, 1))
-            #    end
-            #    path = string(save_dir, "belief_std.txt")
-            #    open(path, "a") do io
-            #        writedlm(io, reshape(b_std, :, 1))
-            #    end
-            end
+            #if t == 1
+            #    inbrowser(D3Tree(policy.tree, init_expand=1), "safari")
+            #end
+
+        elseif a.type == :mine
+            @info "Mining at $t"
+        elseif a.type == :abandon
+            @info "Abandoning at $t"
         end
 
         final_belief = bp
         final_state = sp
-        
+
         if return_all_trees
             push!(trees, deepcopy(policy.tree))
         end
     end
-    if verbose
-        println("Discounted Return: $discounted_return")
-    end
     
     ts = [1:length(abs_errs);] .- 1
 
-    #abs_err_fig = plot(ts, abs_errs, title="absolute volume error",
-    #    xlabel="time step", ylabel="absolute error", legend=:none, lw=2, c=:crimson)
-
-    #rel_err_fig = plot(ts, rel_errs, title="relative volume error",
-    #    xlabel="time step", ylabel="relative error", legend=:none, lw=2, c=:crimson)
-    #rel_err_fig = plot!([xlims()...], [0, 0], lw=1, c=:black, xlims=xlims())
-
-    #vols_fig = plot(ts, vol_stds ./ vol_stds[1], title="volume standard deviation",
-    #    xlabel="time step", ylabel="standard deviation", legend=:none, lw=2, c=:crimson)
-    if isa(save_dir, String)
-        path = string(save_dir, "pos_meters.txt")
-        open(path, "w") do file
-            # Iterate over the vectors and write each pair to the file
-            for i in 1:length(final_state.agent_pos_x)
-                x, y = final_state.agent_pos_x[i], final_state.agent_pos_y[i]
-                println(file, "$x $y")
-            end
-        end
-
-        path = string(save_dir, "pos_base_map.txt")
-        open(path, "w") do file
-            # Iterate over the vectors and write each pair to the file
-            for i in 1:length(final_state.agent_pos_x)
-                x, y = get_base_map_coordinates(final_state.agent_pos_x[i], final_state.agent_pos_y[i], m)
-                println(file, "$x $y")
-            end
-        end
-
-        path = string(save_dir, "pos_smooth_map.txt")
-        open(path, "w") do file
-            # Iterate over the vectors and write each pair to the file
-            for i in 1:length(final_state.agent_pos_x)
-                x, y = get_smooth_map_coordinates(final_state.agent_pos_x[i], final_state.agent_pos_y[i], m)
-                println(file, "$x $y")
-            end
-        end
-
-        #path = string(save_dir, "abs_err.png")
-        #savefig(abs_err_fig, path)
-
-        #path = string(save_dir, "rel_err.png")
-        #savefig(rel_err_fig, path)
-
-        #path = string(save_dir, "vol_std.png")
-        #savefig(vols_fig, path)
-    end
-    #if display_figs
-        #display(abs_err_fig)
-        #display(rel_err_fig)
-        #display(vols_fig)
-    #end
-
-    #return_values = (discounted_return, abs_errs, rel_errs, vol_stds, n_drills, r_massive, last_action)
-    return discounted_return, n_flys, final_belief, final_state, trees;
+    return discounted_return, n_flys, final_belief, final_state, trees
 end
 
 
@@ -487,7 +430,7 @@ function plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; 
 
     # plot true volume in solid red
     plot!(b0_hist, [r_massive, r_massive], [0.0, h_height], linecolor=:crimson, linewidth=3)
-    
+
     # plot mean volume in dashed red
     plot!([mean_vols, mean_vols], [0.0, h_height], linecolor=:crimson, linestyle=:dash, linewidth=2, label=false)
 
@@ -518,7 +461,7 @@ function get_agent_trajectory(bank_angle_history::Vector{Int64}, m::MineralExplo
         push!(pos_y_outer_loop_history, deepcopy(pos_y_history))
         pos_x_history, pos_y_history = [deepcopy(pos_x)], [deepcopy(pos_y)]
     end
-    
+
     # reduce lists of lists to single list
     to_plot_x = reduce(vcat, pos_x_outer_loop_history)
     to_plot_y = reduce(vcat, pos_y_outer_loop_history)
@@ -559,7 +502,7 @@ function check_coordinates(coordinates::Matrix{Int64})
 end
 
 function check_duplicate_coordinates(coordinates::Matrix{Int64})
-    coord_set = Set{Tuple{Int64, Int64}}()
+    coord_set = Set{Tuple{Int64,Int64}}()
 
     for i in 1:size(coordinates, 2)
         coord = (coordinates[1, i], coordinates[2, i])
@@ -571,7 +514,7 @@ function check_duplicate_coordinates(coordinates::Matrix{Int64})
 end
 
 function check_coordinates_and_readings(coordinates::Matrix{Int64}, readings::Vector{Float64})
-    check_coordinates(coordinates)    
+    check_coordinates(coordinates)
     if size(coordinates, 2) != length(readings)
         error("number of readings must match number of coordinates")
     end
@@ -582,21 +525,21 @@ function get_transpose(matrix::Matrix{Int64})
 end
 
 # MAP RELATED BASE FUNCTIONS (functionality)
-function nan_unvisited_cells(matrix::Array{Float64, 3}, coordinates::Union{Matrix{Int64}, Array{Int64, 2}})
+function nan_unvisited_cells(matrix::Array{Float64,3}, coordinates::Union{Matrix{Int64},Array{Int64,2}})
     check_coordinates(coordinates)
 
     # Create a copy of the matrix to avoid modifying the original
     result_matrix = fill(NaN, size(matrix))
-    
+
     for i in 1:size(coordinates, 2)
         x, y = coordinates[:, i]
         result_matrix[x, y, 1] = matrix[x, y, 1]
     end
-    
+
     return result_matrix
 end
 
-function set_readings_in_map(matrix::Array{Float64, 3}, coordinates::Matrix{Int64}, readings::Vector{Float64})
+function set_readings_in_map(matrix::Array{Float64,3}, coordinates::Matrix{Int64}, readings::Vector{Float64})
     check_coordinates_and_readings(coordinates, readings)
     # Create a copy of the matrix to avoid modifying the original
     result_matrix = fill(NaN, size(matrix))
@@ -613,7 +556,7 @@ function continuous_to_coordinate(x::Float64)
     return convert(Int64, ceil(x))
 end
 
-function get_base_map_coordinates(x::Union{Float64, Vector{Float64}}, y::Union{Float64, Vector{Float64}}, m::MineralExplorationPOMDP)
+function get_base_map_coordinates(x::Union{Float64,Vector{Float64}}, y::Union{Float64,Vector{Float64}}, m::MineralExplorationPOMDP)
     return continuous_to_coordinate(x / m.base_grid_element_length), continuous_to_coordinate(y / m.base_grid_element_length)
 end
 
