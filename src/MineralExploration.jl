@@ -71,7 +71,8 @@ export
         particles,
         support,
         get_input_representation,
-        plot_input_representation
+        plot_input_representation,
+        calculate_stop_bound
 include("beliefs.jl")
 
 export

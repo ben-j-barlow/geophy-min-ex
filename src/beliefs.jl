@@ -525,12 +525,13 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
     elseif m.mineral_exploration_mode == "geophysical"
         # if stopped, return mine & abandon
         if b.stopped
+            @info "stopped = true"
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
         end
 
         # if not stopped but stop bound satisfied, return stop
-        tmp = false
-        if tmp # calculate_stop_bound(m, b)
+        #tmp = false
+        if calculate_stop_bound(m, b)
             return MEAction[MEAction(type=:stop)]
         end
         
@@ -555,14 +556,14 @@ function calculate_stop_bound(m::MineralExplorationPOMDP, b::MEBelief)
     lcb = mean_volume - volume_std*m.extraction_lcb
     ucb = mean_volume + volume_std*m.extraction_ucb
 
-    #@info "lcb is $(lcb) = $(mean_volume - volume_std*m.extraction_lcb) >= $(m.extraction_cost) which is extraction cost"
-    #@info "ucb is $(ucb) = $(mean_volume + volume_std*m.extraction_lcb) <= $(m.extraction_cost) which is extraction cost"
+    @info "lcb is $(lcb) = $(mean_volume - volume_std*m.extraction_lcb) >= $(m.extraction_cost) which is extraction cost"
+    @info "ucb is $(ucb) = $(mean_volume + volume_std*m.extraction_lcb) <= $(m.extraction_cost) which is extraction cost"
 
     cond1 = lcb >= m.extraction_cost
     cond2 = ucb <= m.extraction_cost
     
-    #@info "cond1 $(cond1)"
-    #@info "cond2 $(cond2)"
+    @info "cond1 $(cond1)"
+    @info "cond2 $(cond2)"
     
     to_return =  cond1 || cond2
     #@info "calculate stop bound returning $(to_return)"
