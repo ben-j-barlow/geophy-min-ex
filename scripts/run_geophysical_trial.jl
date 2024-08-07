@@ -1,3 +1,4 @@
+using D3Trees
 using Revise
 import BSON: @save, @load
 using POMDPs
@@ -11,11 +12,13 @@ using MineralExploration
 using POMDPPolicies
 
 N_PARTICLES = 1000
-NOISE_FOR_PERTURBATION = 2.0
-C_EXP = 100
-GET_TREES = false
+NOISE_FOR_PERTURBATION = 0.1
+# noise
+# 10 - belief didnt really converge
+C_EXP = 125
+GET_TREES = true
 
-SAVE_DIR = "./data/sandbox/tmp" #instead of +string(variable) OR $(var1+var2)
+SAVE_DIR = "./data/geophys_trial" #instead of +string(variable) OR $(var1+var2)
 !isdir(SAVE_DIR) && mkdir(SAVE_DIR)
 
 #io = MineralExploration.prepare_logger()
@@ -25,19 +28,18 @@ grid_dims = (50, 50, 1)
 m = MineralExplorationPOMDP(
     grid_dim=grid_dims,
     c_exp=C_EXP,
-    sigma=20,
+    sigma=5,
     init_heading=HEAD_NORTH,
-    out_of_bounds_cost=1000,
     mainbody_gen=BlobNode(grid_dims=grid_dims),
     true_mainbody_gen=BlobNode(grid_dims=grid_dims),
     geophysical_noise_std_dev=0.0,
     observations_per_timestep=1,
     timestep_in_seconds=1,
-    init_pos_x=300,
-    init_pos_y=400,
-    bank_angle_intervals=10,
+    init_pos_x=30 * 25,
+    init_pos_y=0,
+    bank_angle_intervals=15,
     max_bank_angle=55,
-    velocity=70,
+    velocity=25,
     base_grid_element_length=25.0
 )
 
@@ -49,14 +51,20 @@ ds0 = POMDPs.initialstate(m)
 Random.seed!(42)
 s0 = rand(ds0; truth=true) #Checked
 
+# get min amd max value of ore map
+min_ore = minimum(s0.ore_map)
+max_ore = maximum(s0.ore_map)
+minimum(s0.smooth_map)
+maximum(s0.smooth_map)
+
 up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION) #Checked
 b0 = POMDPs.initialize_belief(up, ds0) #Checked
 
 solver = POMCPOWSolver(
-    tree_queries=10000,
+    tree_queries=50000,
     k_observation=2.0,
     alpha_observation=0.1,
-    max_depth=5,
+    max_depth=7,
     check_repeat_obs=false,
     check_repeat_act=true,
     enable_action_pw=false,
@@ -70,17 +78,11 @@ solver = POMCPOWSolver(
 )
 planner = POMDPs.solve(solver, m)
 
-discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=150, output_t=3, return_all_trees=GET_TREES);
+discounted_return, n_flys, final_belief, final_state, trees = run_geophysical_trial(m, up, planner, s0, b0, max_t=3, output_t=1, return_all_trees=GET_TREES);
 
+plot_base_map_and_plane_trajectory(final_state, m)
 
-
-#plot(final_belief)
-#MineralExploration.close_logger(io)
-
-#minimum(s0.smooth_map[:, :, 1])
-
-# smooth map coordinates 7, 10 noiseless geo obs 0.26859071353819397 
-
-#using D3Trees
-#tree_1 = trees[1]
-#inbrowser(D3Tree(tree_1, init_expand=1), "safari")
+for i in 1:3
+    inbrowser(D3Tree(trees[i], init_expand=1), "safari")
+    @info ""
+end

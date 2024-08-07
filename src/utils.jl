@@ -335,9 +335,9 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             #push!(rel_errs, re)
             #push!(vol_stds, std_vols)
             if t % output_t == 0 || t == 1
-                b_fig_base = plot(bp, m, sp, t)
+                b_fig_base = plot(bp, m, sp, t=t)
                 b_hist, vols, mean_vols, std_vols = plot_volume(m, bp, r_massive; t=t, verbose=false)
-                map_and_plane = plot_smooth_map_and_plane_trajectory(sp, m)
+                map_and_plane = plot_base_map_and_plane_trajectory(sp, m, t=t)
                 
                 if isa(save_dir, String)
                     path = string(save_dir, "b$t.png")
