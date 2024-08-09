@@ -136,8 +136,6 @@ for i in 1:30
         open(path, "a") do io
             println(io, "Vols at time $i: $(mn) ± $(std)")
         end
-
-        calculate_stop_bound(m, bp)
     end
     
     b = bp
