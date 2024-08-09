@@ -118,7 +118,8 @@ function POMDPs.initialstate(m::MineralExplorationPOMDP)
 end
 
 function smooth_map_with_filter(map::Array{Float64}, sigma::Float64, upscale_factor::Int)
-    map_2d = reshape(map, 50, 50) # Remove the third dimension since it is 1
+    dim = size(map)[1]
+    map_2d = reshape(map, dim, dim) # Remove the third dimension since it is 1
     interpolated_map = interpolate(map_2d, BSpline(Linear())) # Increase the resolution using interpolation
 
     # Generate the high resolution grid points and image
@@ -217,7 +218,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     
     # drill then stop then mine or abandon
     if a_type == :stop && !stopped && !decided
-        obs = MEObservation(nothing, true, true, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), last(s.agent_bank_angle))
+        obs = MEObservation(nothing, true, false, nothing, s.agent_heading, last(s.agent_pos_x), last(s.agent_pos_y), last(s.agent_bank_angle))
         rock_obs_p = s.rock_obs
         stopped_p = true
         decided_p = false
@@ -305,7 +306,7 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
                 #@info "negative flying cost $(r)"
             else
                 r = - (m.fly_cost + m.out_of_bounds_cost)
-                #@info "negative flying cost with out of bounds cost $(r)"
+                @info "negative flying cost with out of bounds cost $(r)"
             end
         elseif a_type == :mine
             r = extraction_reward(m, s)
