@@ -10,7 +10,7 @@ using LinearAlgebra
 include("../helpers.jl")
 
 
-save_dir = "./data/step_by_step/"
+save_dir = "./data/manual_flying/"
 
 
 if isdir(save_dir)
