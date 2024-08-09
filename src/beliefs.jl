@@ -444,10 +444,11 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     bp_stopped = o.stopped
     bp_decided = o.decided
 
-    agent_bank_angle_p = push!(deepcopy(b.agent_bank_angle), o.agent_bank_angle)
+    bp_agent_bank_angle = deepcopy(b.agent_bank_angle)
+    push!(bp_agent_bank_angle, o.agent_bank_angle)
 
     return MEBelief(bp_particles, bp_rock, bp_acts, bp_obs, bp_stopped,
-        bp_decided, bp_geostats, up, bp_geophysical_obs, agent_bank_angle_p)
+        bp_decided, bp_geostats, up, bp_geophysical_obs, bp_agent_bank_angle)
 end
 
 function Base.rand(rng::AbstractRNG, b::MEBelief)
@@ -525,7 +526,6 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
     elseif m.mineral_exploration_mode == "geophysical"
         # if stopped, return mine & abandon
         if b.stopped
-            @info "stopped = true"
             return MEAction[MEAction(type=:mine), MEAction(type=:abandon)]
         end
 
@@ -536,7 +536,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
         end
         
         # if not stopped and stop bound not satisfied, return 3 flying actions subject to bank angle (-45 deg, 45 deg) constraints
-        return collect(get_flying_actions(m, last(b.agent_bank_angle)))
+        return get_flying_actions(m, last(b.agent_bank_angle))
     end
     error("Invalid mineral exploration mode")
 end
@@ -556,14 +556,14 @@ function calculate_stop_bound(m::MineralExplorationPOMDP, b::MEBelief)
     lcb = mean_volume - volume_std*m.extraction_lcb
     ucb = mean_volume + volume_std*m.extraction_ucb
 
-    @info "lcb is $(lcb) = $(mean_volume - volume_std*m.extraction_lcb) >= $(m.extraction_cost) which is extraction cost"
-    @info "ucb is $(ucb) = $(mean_volume + volume_std*m.extraction_lcb) <= $(m.extraction_cost) which is extraction cost"
+    #@info "lcb is $(lcb) = $(mean_volume - volume_std*m.extraction_lcb) >= $(m.extraction_cost) which is extraction cost"
+    #@info "ucb is $(ucb) = $(mean_volume + volume_std*m.extraction_lcb) <= $(m.extraction_cost) which is extraction cost"
 
     cond1 = lcb >= m.extraction_cost
     cond2 = ucb <= m.extraction_cost
     
-    @info "cond1 $(cond1)"
-    @info "cond2 $(cond2)"
+    #@info "cond1 $(cond1)"
+    #@info "cond2 $(cond2)"
     
     to_return =  cond1 || cond2
     #@info "calculate stop bound returning $(to_return)"

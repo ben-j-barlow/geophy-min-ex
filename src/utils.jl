@@ -185,7 +185,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         end
         final_belief = bp
         if return_all_trees
-            push!(trees, deepcopy(policy.tree))
+            push!(trees, deepcopy(policy.tree));
         end
         if collect_training_data && a.type == :drill # NOTE that :stop and beyond have the same belief representation and obs.
             data = BetaZeroTrainingData(get_input_representation(bp), nothing, nothing)
@@ -321,8 +321,15 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     final_belief = nothing
     final_state = nothing
     trees = []
+    open(string(save_dir, "b_info.txt"), "w") do io
+        println(io, "create")
+    end
 
     for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=max_t, rng=m.rng)
+        open(string(save_dir, "b_info.txt"), "a") do io
+            println(io, "timestep $t stopped is $(bp.stopped)")
+            println(io, "timestep $t decided is $(bp.decided)")
+        end
 
         discounted_return += POMDPs.discount(m)^(t - 1) * r
         last_action = a.type
@@ -349,7 +356,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
                         println(io, "Vols at time $t: $(mn) ± $(std)")
                     end
 
-                    @info "Vols at time 0: $mn ± $std"
+                    @info "Vols at time $t: $mn ± $std"
                 end
 
                 if display_figs
@@ -401,8 +408,8 @@ end
 
 function plot_map(map, title)
     #@info "plot_map(map, title)"
-    xl = (0.5, size(map, 1) + 0.5)
-    yl = (0.5, size(map, 2) + 0.5)
+    xl = (-2.5, size(map, 1) + 2.5)
+    yl = (-2.5, size(map, 2) + 2.5)
     return heatmap(map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=:viridis)
 end
 

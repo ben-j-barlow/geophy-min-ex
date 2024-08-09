@@ -306,7 +306,7 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
                 #@info "negative flying cost $(r)"
             else
                 r = - (m.fly_cost + m.out_of_bounds_cost)
-                @info "negative flying cost with out of bounds cost $(r)"
+                #@info "negative flying cost with out of bounds cost $(r)"
             end
         elseif a_type == :mine
             r = extraction_reward(m, s)
@@ -321,6 +321,13 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
     return r
 end
 
+function reward_a(s::MEState)
+    if is_empty(s.geophysical_obs)
+        return 0
+    else
+        return last(s.geophysical_obs.reading)
+    end
+end
 
 function POMDPs.actions(m::MineralExplorationPOMDP)
     #@info "POMDPs.actions(m::MineralExplorationPOMDP)"
