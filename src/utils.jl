@@ -118,6 +118,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     vol_stds = Float64[std_vols]
     dists = Float64[]
     final_belief = nothing
+    beliefs = []
     trees = []
     if verbose
         println("Entering Simulation...")
@@ -173,6 +174,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             end
         end
         final_belief = bp
+        push!(beliefs, bp)
         if return_all_trees
             push!(trees, deepcopy(policy.tree))
         end
@@ -221,7 +223,7 @@ function run_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
         display(rel_err_fig)
         display(vols_fig)
     end
-    return_values = (discounted_return, dists, abs_errs, rel_errs, vol_stds, n_drills, r_massive, last_action)
+    return_values = (discounted_return, dists, abs_errs, rel_errs, vol_stds, n_drills, r_massive, last_action, beliefs)
     if return_final_belief
         return_values = (return_values..., final_belief)
     end

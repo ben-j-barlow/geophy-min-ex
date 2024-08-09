@@ -15,13 +15,13 @@ using POMDPPolicies
 Random.seed!(1004) # determinism
 
 N_INITIAL = 0
-MAX_BORES = 2
+MAX_BORES = 10
 MIN_BORES = 2
 GRID_SPACING = 0
 MAX_MOVEMENT = 20
 
 C_EXP = 2
-SAVE_DIR = "./data/demos/multishape_sandbox/4-19_$C_EXP" #instead of +string(variable) OR $(var1+var2)
+SAVE_DIR = "./data/moss_mfms" #instead of +string(variable) OR $(var1+var2)
 
 !isdir(SAVE_DIR) && mkdir(SAVE_DIR)
 
@@ -49,7 +49,7 @@ i_tree_queries = 1
 
 usepomcpow = true
 if usepomcpow == true
-    solver = POMCPOWSolver(tree_queries=tree_queries[i_tree_queries],
+    solver = POMCPOWSolver(tree_queries=100,
                         check_repeat_obs=true,
                         check_repeat_act=true,
                         next_action=next_action,
@@ -61,7 +61,7 @@ if usepomcpow == true
                         final_criterion=POMCPOW.MaxQ(),
                         # final_criterion=POMCPOW.MaxTries(),
                         estimate_value=0.0,
-                        max_depth=1,
+                        max_depth=3,
                         # estimate_value=leaf_estimation,
                         )
     planner = POMDPs.solve(solver, m)
@@ -70,5 +70,27 @@ else
     planner = RandomPolicy(m, updater = up)
 end
 
-timing = @timed results = run_trial(m, up, planner, s0, b0, save_dir=SAVE_DIR, display_figs=false)
+timing = @timed results = run_trial(m, up, planner, s0, b0, save_dir=SAVE_DIR, display_figs=false, return_all_trees=true)
 @show timing.time
+
+
+beliefs = results[9];
+final_belief = beliefs[end];
+
+final_belief.acts
+
+beliefs[1].stopped
+beliefs[1].decided
+
+beliefs[2].stopped
+beliefs[2].decided
+
+beliefs[3].stopped
+beliefs[3].decided
+
+beliefs[4].stopped
+beliefs[4].decided
+
+using D3Trees
+trees = results[10];
+inbrowser(D3Tree(trees[4], init_expand=1), "safari")
