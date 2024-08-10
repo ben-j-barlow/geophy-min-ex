@@ -47,7 +47,8 @@ export
         MainbodyGen,
         GeophysicalObservations,
         aggregate_base_map_duplicates,
-        aggregate_smooth_map_duplicates
+        aggregate_smooth_map_duplicates,
+        get_geophysical_solver
 include("common.jl")
 
 export
@@ -98,7 +99,8 @@ export
         ExpertPolicy,
         RandomSolver,
         GridPolicy,
-        leaf_estimation
+        leaf_estimation,
+        geophysical_leaf_estimation
 include("solver.jl")
 
 export
