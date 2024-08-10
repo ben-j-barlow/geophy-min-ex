@@ -56,17 +56,11 @@ end
 
 function sample_initial(p::MineralExplorationPOMDP, n::Integer)
     #@info "sample_initial(p::MineralExplorationPOMDP, n::Integer)"
-    if p.mineral_exploration_mode == "borehole"
-        coords, coords_array = sample_coords(p.grid_dim, n)
-        dist = GeoStatsDistribution(p)
-        state = rand(p.rng, dist)
-        ore_quality = state[coords]
-        return RockObservations(ore_quality, coords_array)
-    elseif p.mineral_exploration_mode == "geophysical"
-        error("Geophysical mode not implemented yet")
-    else
-        error("Invalid Mineral Exploration Mode: $(p.mineral_exploration_mode)")
-    end
+    coords, coords_array = sample_coords(p.grid_dim, n)
+    dist = GeoStatsDistribution(p)
+    state = rand(p.rng, dist)
+    ore_quality = state[coords]
+    return RockObservations(ore_quality, coords_array)
 end
 
 function sample_initial(p::MineralExplorationPOMDP, coords::Array)
@@ -86,8 +80,10 @@ end
 
 function initialize_data!(p::MineralExplorationPOMDP, n::Integer)
     #@info "initialize_data!(p::MineralExplorationPOMDP, n::Integer)"
-    if p.mineral_exploration_mode == "geophysical" 
-        error("Geophysical mode not implemented yet")
+    if p.mineral_exploration_mode == "geophysical"
+        if n > 0
+            error("n > 0 not implemented for geophysical mode")
+        end
     end
     new_rock_obs = sample_initial(p, n)
     append!(p.initial_data.ore_quals, new_rock_obs.ore_quals)
@@ -135,7 +131,7 @@ function smooth_map_with_filter(map::Array{Float64}, sigma::Float64, upscale_fac
     return reshape(smooth_map, new_dims[1], new_dims[2], 1)
 end
 
-function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth::Bool=false, apply_scale::Bool=false)
+function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth::Bool=false, apply_scale::Bool=false, save_dir::Union{String,Nothing}=nothing)
     #@info "Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth::Bool=false, apply_scale::Bool=false)"
     gp_dist = truth ? d.true_gp_distribution : d.gp_distribution
     gp_ore_maps = Base.rand(rng, gp_dist, n)
@@ -152,6 +148,13 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         lode_map = normalize_and_weight(lode_map, d.mainbody_weight)
 
         gp_ore_map = gp_ore_maps[i]
+        if save_dir != nothing && n == 1
+            plot_mainbody = plot_map(lode_map, "noiseless ore map", axis=false)
+            plot_gp_ore = plot_map(gp_ore_map, "background variation map", axis=false)
+            
+            savefig(plot_gp_ore, string(save_dir, "0gp_map.png"))
+            savefig(plot_mainbody, string(save_dir, "0lode_map.png"))
+        end
         ore_map = lode_map + gp_ore_map  # mineralization and geo noise
         if apply_scale
             ore_map, lode_params = scale_sample(d, mainbody_gen, lode_map, gp_ore_map, lode_params; target_μ=d.target_μ, target_σ=d.target_σ)
@@ -209,8 +212,13 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     end
 
     if a ∉ POMDPs.actions(m, s)  # has no check on confidence when stop is chosen in geophysical case
+        if a.type == :fly
+            @info "Invalid Action (in POMPDs.gen) $(a.change_in_bank_angle) given current_bank_angle $(last(s.agent_bank_angle))"
+        else
+            @info "Invalid Action in POMPDs.gen is $(a.type)"
+        end
         _ = POMDPs.actions(m, s, verbose=true)
-        error("Invalid Action $(a.change_in_bank_angle) from state with current_bank_angle $(last(s.agent_bank_angle))")
+        error("invalid action")
     end
     stopped = s.stopped
     decided = s.decided
@@ -260,16 +268,21 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         #@info "new bank angle is $(new_bank_angle)"
         current_geophysical_obs, pos_x, pos_y, heading_p = generate_geophysical_obs_sequence(m, s, a, new_bank_angle)
     
-        # build MEObservation
-        stopped_p = false 
-        decided_p = false
-        obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, new_bank_angle)
-
+        
         # prepare for MEState
         geo_obs_p = append_geophysical_obs_sequence(deepcopy(s.geophysical_obs), current_geophysical_obs)
         pos_x_p = push!(deepcopy(s.agent_pos_x), deepcopy(pos_x))
         pos_y_p = push!(deepcopy(s.agent_pos_y), deepcopy(pos_y))
         bank_angle_p = push!(deepcopy(s.agent_bank_angle), deepcopy(new_bank_angle))
+
+        # build MEObservation
+        n_reading = length(geo_obs_p.reading)
+        if m.observations_per_timestep > 1
+            error("assumes one observation per timestep when calculaing n_reading")
+        end
+        stopped_p = n_reading >= m.max_timesteps 
+        decided_p = false
+        obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, new_bank_angle)
 
         # create dummy variable
         rock_obs_p = deepcopy(s.rock_obs)
@@ -413,7 +426,7 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
 
     # in the borehole version, the noise only stems from the background variation in the subsurface
     # in the geophysical version, the noise stems from the smoothing of the map, the sensor noise, and the background variation in the subsurface
-    
+    n_obs = -1.0
     if m.mineral_exploration_mode == "borehole"
         w = 0.0
         if a.type != :drill
@@ -460,7 +473,7 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
             if o.geophysical_obs == nothing # mine, abandon, stop lead to == nothing
                 w = 1.0
             elseif is_empty(o.geophysical_obs) # flying outside of region leads to empty GeophysicalObservations
-                w = 1.0
+                w = 0.001
             else
                 error("o.geophysical_reading unexpectedly not nothing")
             end
@@ -558,7 +571,8 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
         
             # generate observation
             #@info "smooth map coordinates $(x_smooth_map), $(y_smooth_map)"
-            obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
+            #obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
+            obs = geophysical_obs(x_base_map, y_base_map, s.ore_map, m.geophysical_noise_std_dev)
             push!(tmp_go.reading, deepcopy(obs))
             tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[y_smooth_map x_smooth_map], 2, 1))
             tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[y_base_map x_base_map], 2, 1))
