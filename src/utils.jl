@@ -406,7 +406,7 @@ function plot_ore_map(ore_map, cmap=:viridis, title="true ore map")
     return heatmap(ore_map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
 end
 
-function plot_map(map, title; allow_space=true, axis=true)
+function plot_map(map, title; allow_space=false, axis=true)
     #@info "plot_map(map, title)"
     if allow_space
         xl = (-2.5, size(map, 1) + 2.5)
@@ -494,8 +494,8 @@ function add_agent_trajectory_to_plot!(p, x, y)
     # when parsed, x and y correspond to x being east-west and y being north-south
     # add 1 to each coordinate to account for 1-based indexing
     for i in 1:length(x)
-        x[i] += 1
-        y[i] += 1
+        x[i] += 0.5
+        y[i] += 0.5
     end
     plot!(p, x, y, color="red", lw=2, label=:none)
     annotate!(x[1], y[1], Plots.text("S", 10, :black, rotation=0))
