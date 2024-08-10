@@ -406,20 +406,27 @@ function plot_ore_map(ore_map, cmap=:viridis, title="true ore map")
     return heatmap(ore_map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
 end
 
-function plot_map(map, title)
+function plot_map(map, title; allow_space=true, axis=true)
     #@info "plot_map(map, title)"
-    xl = (-2.5, size(map, 1) + 2.5)
-    yl = (-2.5, size(map, 2) + 2.5)
-    return heatmap(map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=:viridis)
+    if allow_space
+        xl = (-2.5, size(map, 1) + 2.5)
+        yl = (-2.5, size(map, 2) + 2.5)
+    else
+        #xl = (-0.5, size(map, 1) + 0.5)
+        #yl = (-0.5, size(map, 2) + 0.5)
+        xl = (0, size(map, 1))
+        yl = (0, size(map, 2))
+    end
+    return heatmap(map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, axis=axis, ylims=yl, c=:viridis)
 end
 
-function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)
+function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false, axis=true)
     #@info "plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)"
     xl = (0.5, size(ore_map, 1) + 0.5)
     yl = (0.5, size(ore_map, 2) + 0.5)
     s_massive = ore_map .>= massive_threshold
     r_massive = dim_scale * sum(s_massive)
-    mass_fig = heatmap(s_massive[:, :, 1], title="massive ore deposits: $(round(r_massive, digits=2))", fill=true, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
+    mass_fig = heatmap(s_massive[:, :, 1], title="massive ore deposits: $(round(r_massive, digits=2))", fill=true, axis=axis, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
     return (mass_fig, r_massive)
 end
 
@@ -485,6 +492,11 @@ end
 
 function add_agent_trajectory_to_plot!(p, x, y)
     # when parsed, x and y correspond to x being east-west and y being north-south
+    # add 1 to each coordinate to account for 1-based indexing
+    for i in 1:length(x)
+        x[i] += 1
+        y[i] += 1
+    end
     plot!(p, x, y, color="red", lw=2, label=:none)
     annotate!(x[1], y[1], Plots.text("S", 10, :black, rotation=0))
 end
