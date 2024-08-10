@@ -276,9 +276,16 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
         geo_obs_p = GeophysicalObservations(geo_obs.reading, geo_obs.smooth_map_coordinates, geo_obs.base_map_coordinates)
 
         smooth_map = smooth_map_with_filter(ore_map, up.sigma, up.upscale_factor)
+        
+        agent_pos_x_p = deepcopy(s.agent_pos_x)
+        agent_pos_y_p = deepcopy(s.agent_pos_y)
+        bank_angle_p = deepcopy(s.agent_bank_angle)
+        push!(agent_pos_x_p, o.agent_pos_x)
+        push!(agent_pos_y_p, o.agent_pos_y)
+        push!(bank_angle_p, o.agent_bank_angle)
 
         sp = MEState(ore_map, smooth_map, mainbody_param, mainbody_map, s.rock_obs,
-            o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_bank_angle, geo_obs_p)
+            o.stopped, o.decided, o.agent_heading, agent_pos_x_p, agent_pos_y_p, bank_angle_p, geo_obs_p)
         push!(mainbody_params, mainbody_param)
         push!(particles, sp)
     end
@@ -639,7 +646,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
             # add stop and flying actions to the belief tree
             to_return = get_flying_actions(m, last(s.agent_bank_angle))
             push!(to_return, MEAction(type=:stop))
-            return collect(to_return)
+            return to_return
         end
     end
 end
