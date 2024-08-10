@@ -204,6 +204,40 @@ function leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.
     end
 end
 
+function geophysical_leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.BeliefNode, ::Any)
+    #@info "leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.BeliefNode, ::Any)"
+    # prepare discount
+    if s.stopped
+        γ = POMDPs.discount(pomdp)
+    else
+        if is_empty(s.geophysical_obs)
+            n_readings = 0
+        else
+            if pomdp.observations_per_timestep != 1
+                error("assumed one observation per timestep")
+            end
+            n_readings = length(s.geophysical_obs.reading)
+        end
+        t = pomdp.max_timesteps - n_readings + 1
+        γ = POMDPs.discount(pomdp)^t
+    end
+
+    # prepare return value
+    if s.decided
+        return 0.0
+    elseif !check_plane_within_region(pomdp, last(s.agent_pos_x), last(s.agent_pos_y))
+        return -100.0
+    else
+        r_extract = extraction_reward(pomdp, s)
+        if r_extract >= 0.0
+            return γ*r_extract*0.9
+        else
+            return γ*r_extract*0.1
+        end
+        # return γ*r_extract
+    end
+end
+
 struct GridPolicy <: Policy
     m::MineralExplorationPOMDP
     n::Int64 # Number of grid points per dimension (n x n)
