@@ -191,3 +191,113 @@ Turning: x=313.07, y=1267.33, psi=-56.60, phi=-40.00, target_heading=270.00
 Turning: x=319.35, y=1243.13, psi=-75.46, phi=-40.00, target_heading=270.00
 Turning: x=317.46, y=1218.20, psi=-94.33, phi=-40.00, target_heading=270.00
 Turning: x=307.62, y=1195.22, psi=-113.19, phi=-40.00, target_heading=270.00
+
+
+init_head = 0
+cumu_psi = 0
+
+g = 9.81
+v = 30
+
+function get_psi_dot(bank_angle, v, g)
+    return g * tan(bank_angle) / v
+end
+
+
+# intervals 15
+# max 55
+# get all multiples of interval until max
+
+max_bank_angle = 55
+interval = 15
+
+
+multiples = [i for i in interval:interval:max_bank_angle]
+if length(multiples) == 0
+    error("no multiples")
+end
+
+bank_angles_to_return = []
+
+# find out the multiples in the increment and decrement phase
+multiples_rad = [val * DEG_TO_RAD for val in multiples]
+ind_for_change = [i for i in 1:length(multiples_rad) - 1]
+for angle in multiples[ind_for_change]
+    push!(bank_angles_to_return, angle)
+end
+
+# calculate the psi change during increment and decrement phase
+psi_change_during_increment_rad = sum([get_psi_dot(multiples_rad[i], v, g) for i in ind_for_change])
+psi_change_during_increment = psi_change_during_increment_rad / DEG_TO_RAD
+
+# calculate the psi change at highest bank angle
+remaining_psi = 90 - (2 * psi_change_during_increment)
+highest_bank_angle = multiples[end]
+psi_change_at_highest = get_psi_dot(highest_bank_angle * DEG_TO_RAD, v, g) / DEG_TO_RAD
+
+# calculate number of timesteps at highest bank angle
+while remaining_psi > psi_change_at_highest
+    push!(bank_angles_to_return, highest_bank_angle)
+    remaining_psi -= psi_change_at_highest
+end
+
+# calculate the final phi
+remaining_psi_rad = remaining_psi * DEG_TO_RAD # Convert remaining psi to radians
+final_phi = atan(remaining_psi_rad * v / g) # Calculate the required bank angle (phi)
+
+# push decrement bank angle part of turn
+for angle in multiples[reverse(ind_for_change)]
+    push!(bank_angles_to_return, angle)
+end
+
+# push final bank angle (this will be X such that 0 < X < bank angle intervals)
+push!(bank_angles_to_return, final_phi / DEG_TO_RAD)
+
+
+x = 0.0
+y = 0.0
+phi = 0
+psi = 0.0
+
+
+for angle in bank_angles_to_return
+    x, y, psi = update_agent_state(x, y, psi, convert(Float64, angle), v)
+end
+
+psi / DEG_TO_RAD
+
+head
+
+bank_angle = 15.0
+psi_dot = g * tan(bank_angle * DEG_TO_RAD) / v
+cumu_psi += psi_dot / DEG_TO_RAD
+
+bank_angle = 30.0
+psi_dot = g * tan(bank_angle * DEG_TO_RAD) / v
+cumu_psi += psi_dot / DEG_TO_RAD
+
+bank_angle = 45.0
+psi_dot = g * tan(bank_angle * DEG_TO_RAD) / v
+cumu_psi += psi_dot / DEG_TO_RAD
+
+bank_angle = 45.0
+psi_dot = g * tan(bank_angle * DEG_TO_RAD) / v
+cumu_psi += psi_dot / DEG_TO_RAD
+
+bank_angle = 45.0
+psi_dot = g * tan(bank_angle * DEG_TO_RAD) / v
+cumu_psi += psi_dot / DEG_TO_RAD
+
+bank_angle = 30.0
+psi_dot = g * tan(bank_angle * DEG_TO_RAD) / v
+cumu_psi += psi_dot / DEG_TO_RAD
+
+bank_angle = 15.0
+psi_dot = g * tan(bank_angle * DEG_TO_RAD) / v
+cumu_psi += psi_dot / DEG_TO_RAD
+
+remaining_psi = 90 - cumu_psi
+
+bank_angle = phi_deg
+psi_dot = g * tan(bank_angle * DEG_TO_RAD) / v
+cumu_psi += psi_dot / DEG_TO_RAD

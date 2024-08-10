@@ -45,17 +45,17 @@ m = MineralExplorationPOMDP(
     geophysical_noise_std_dev=0.0,
     observations_per_timestep=1,
     timestep_in_seconds=1,
-    init_pos_x=10.0,
-    init_pos_y=20.0,
+    init_pos_x=2.0,
+    init_pos_y=-5.0,
     init_heading=HEAD_NORTH,
     bank_angle_intervals=15,
     max_bank_angle=55,
     velocity=25,
     base_grid_element_length=25.0,
-    extraction_cost=60.0,
-    extraction_lcb = 0.5,
-    extraction_ucb = 0.5,
-    out_of_bounds_cost=1000.0,
+    extraction_cost=70.0,
+    extraction_lcb = 0.7,
+    extraction_ucb = 0.7,
+    out_of_bounds_cost=0.0,
 )
 
 # do not call
@@ -63,7 +63,9 @@ m = MineralExplorationPOMDP(
 
 ds0 = POMDPs.initialstate(m)
 
-Random.seed!(SEED)
+#Random.seed!(SEED)
+#seed = 4293 #convert(Int64, floor(rand() * 10000))
+#Random.seed!(seed)  # Reseed with a new random seed
 s0 = rand(ds0; truth=true) #Checked
 
 up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION) #Checked
@@ -72,8 +74,8 @@ b0 = POMDPs.initialize_belief(up, ds0) #Checked
 solver = POMCPOWSolver(
     tree_queries=10000,
     k_observation=2.0,
-    alpha_observation=0.1,
-    max_depth=7,
+    alpha_observation=0.3,
+    max_depth=3,
     check_repeat_obs=false,
     check_repeat_act=true,
     enable_action_pw=false,
@@ -82,7 +84,7 @@ solver = POMCPOWSolver(
     #k_action=nothing,
     criterion=POMCPOW.MaxUCB(m.c_exp),
     final_criterion=POMCPOW.MaxQ(),
-    estimate_value=leaf_estimation,
+    estimate_value=geophysical_leaf_estimation,
     tree_in_info=GET_TREES,
 )
 planner = POMDPs.solve(solver, m)
@@ -104,6 +106,7 @@ empty!(p)
 # mass map
 p, r_massive = plot_mass_map(s0.ore_map, m.massive_threshold, :viridis; truth=true)
 savefig(p, string(save_dir, "0mass_map.png"))
+display(p)
 empty!(p)
 
 # initial volume
@@ -119,11 +122,34 @@ end
 
 trees = []
 
-for i in 1:50
-    a, ai = action_info(planner, b, tree_in_info=true);
-    tree = ai[:tree];
-    if i % 2 == 0
-        push!(trees, tree);
+beliefs = []
+states = []
+
+bank_angle = 0
+T = 100
+for i in 1:T
+    a = nothing
+    ai = nothing
+    try
+        a, ai = action_info(planner, b, tree_in_info=GET_TREES);
+        if a.type != :fly
+            @info "$(a.type) at $i"
+        end
+    catch e
+        @info "error was caught"
+        inbrowser(D3Tree(tree, init_expand=1), "safari")
+        break
+    end
+    if a.type == :fly
+        bank_angle += a.change_in_bank_angle
+        @info "Bank angle at $i: $bank_angle"
+    end
+    if GET_TREES
+        tree = deepcopy(ai[:tree]);
+        #if i % 1 == 0 # && i >= 9
+            #push!(trees, tree);
+            #inbrowser(D3Tree(tree, init_expand=1), "safari")
+        #end    
     end
     out = gen(m, s, a, m.rng);
     o = out[:o];
@@ -143,12 +169,12 @@ for i in 1:50
         p, _, mn, std = plot_volume(m, bp, r_massive, t=i, verbose=false)
         @info "Vols at time $i: $mn ± $std"
         savefig(p, string(save_dir, "$(i)volume.png"))
-        display(p)
+        #display(p)
         empty!(p)
         
         p = plot(bp, m, sp, t=i)
         savefig(p, string(save_dir, "$(i)b.png"))
-        display(p)
+        #display(p)
         empty!(p)
 
         p = plot_base_map_and_plane_trajectory(sp, m, t=i)
@@ -164,4 +190,22 @@ for i in 1:50
     
     b = bp
     s = sp
+
+    push!(beliefs, b)
+    push!(states, s)
+
+    if b.decided 
+        break
+    end
 end
+
+
+#for i in 2:(T+1)
+#    @info "at time $(i-1) plane is $(check_plane_within_region(m, s.agent_pos_x[i], s.agent_pos_y[i])) in region with (x,y) coord ($(s.agent_pos_x[i]),$(s.agent_pos_y[i]))"
+#end]
+#last(b.agent_bank_angle)
+
+
+s.agent_bank_angle
+b.agent_bank_angle
+isequal(b.particles[1].agent_bank_angle, s.agent_bank_angle)
