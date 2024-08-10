@@ -164,18 +164,18 @@ abstract type MainbodyGen end
     upscale_factor::Int = 5  # factor to upscale the grid by for smooth, higher resolution map
     smooth_grid_element_length::Float64 = base_grid_element_length / upscale_factor
     sigma::Float64 = 10  # for smoothing map with gaussian filter
-    geophysical_noise_std_dev::Float64 = 0.0
+    geophysical_noise_std_dev::Float64 = 0.01
     max_timesteps::Int = 100
     mineral_exploration_mode = "geophysical" # borehole or geophysical
     fly_cost::Float64 = 0.01
-    out_of_bounds_cost::Float64 = 50.0  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
+    out_of_bounds_cost::Float64 = 0.0  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
     out_of_bounds_tolerance::Int = 0 # number of grid base map grid squares the agent can be out of bounds before incurring cost
     massive_threshold::Float64 = 0.7
     strike_reward::Float64 = 1.0
     init_bank_angle::Int = 0
-    init_pos_x::Float64 = 0.0
+    init_pos_x::Float64 = 62.5
     init_pos_y::Float64 = 0.0
-    init_heading::Float64 = (HEAD_EAST + HEAD_NORTH) / 2
+    init_heading::Float64 = HEAD_NORTH
     max_bank_angle::Int = 55
     bank_angle_intervals::Int = 10
     timestep_in_seconds::Int = 1
@@ -204,4 +204,21 @@ struct MEInitStateDist  # prior over state space
     sigma::Float64  # for smoothing map with gaussian filter
     upscale_factor::Int
     m::MineralExplorationPOMDP
+end
+
+# prepare POMCPOW
+function get_geophysical_solver(c_exp::Int64, get_tree::Bool=false)
+    return POMCPOWSolver(
+        tree_queries=10000,
+        k_observation=2.0,
+        alpha_observation=0.3,
+        max_depth=3,
+        check_repeat_obs=false,
+        check_repeat_act=true,
+        enable_action_pw=false,
+        criterion=POMCPOW.MaxUCB(c_exp),
+        final_criterion=POMCPOW.MaxQ(),
+        estimate_value=geophysical_leaf_estimation,
+        tree_in_info=get_tree,
+    )
 end
