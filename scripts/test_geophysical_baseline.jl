@@ -9,7 +9,7 @@ using MineralExploration
 
 # Constants for the problem setup
 GRID_DIMS = (30, 30, 1)
-N_TRIALS = 10
+N_TRIALS = 1
 NOISE_FOR_PERTURBATION = 0.3
 N_PARTICLES = 1000
 C_EXP = 100
@@ -29,7 +29,7 @@ up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION)
 b0 = POMDPs.initialize_belief(up, ds0)
 
 # set up the solver
-max_coord = m.grid_dim[1]
+max_coord = m.grid_dim[1] * m.upscale_factor
 policy = BaselineGeophysicalPolicy(m, max_coord, MOVE_SIZE, SIDESTEP_SIZE, INIT_COORDS, EARLY_STOP)
 
 # more setup
