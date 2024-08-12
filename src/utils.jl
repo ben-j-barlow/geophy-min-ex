@@ -326,13 +326,11 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     end
 
     for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", max_steps=max_t, rng=m.rng)
-        open(string(save_dir, "b_info.txt"), "a") do io
-            println(io, "timestep $t stopped is $(bp.stopped)")
-            println(io, "timestep $t decided is $(bp.decided)")
-        end
-
         discounted_return += POMDPs.discount(m)^(t - 1) * r
         last_action = a.type
+
+        b_hist, vols, mn, std = plot_volume(m, bp, r_massive; t=t, verbose=false)
+        @info "Vols at time $t: $mn ± $std"
 
         if a.type == :fly
             n_flys += 1
@@ -356,7 +354,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
                         println(io, "Vols at time $t: $(mn) ± $(std)")
                     end
 
-                    @info "Vols at time $t: $mn ± $std"
+                    #@info "Vols at time $t: $mn ± $std"
                 end
 
                 if display_figs
@@ -377,10 +375,20 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
             #    inbrowser(D3Tree(policy.tree, init_expand=1), "safari")
             #end
 
-        elseif a.type == :mine
-            @info "Mining at $t"
-        elseif a.type == :abandon
-            @info "Abandoning at $t"
+        elseif a.type == :mine || a.type == :abandon
+            if isdir(save_dir)
+                open(string(save_dir, "b_info.txt"), "a") do io
+                    b_hist, vols, mn, std = plot_volume(m, bp, r_massive; t=t, verbose=false)
+                    println(io, "action $(bp.acts[end].type)")
+                    println(io, "at time $t")
+                    println(io, "true ore size $r_massive")
+                    println(io, "final belief $mn ± $std")
+                end
+            end
+
+            if verbose
+                @info "$(a.type) at $t"
+            end
         end
 
         final_belief = bp
@@ -393,7 +401,7 @@ function run_geophysical_trial(m::MineralExplorationPOMDP, up::POMDPs.Updater,
     
     ts = [1:length(abs_errs);] .- 1
 
-    return discounted_return, n_flys, final_belief, final_state, trees
+    return discounted_return, n_flys, final_belief, final_state, trees;
 end
 
 
@@ -598,7 +606,7 @@ end
 function plot_base_map_and_plane_trajectory(s::MEState, m::MineralExplorationPOMDP; t=nothing)
     #x, y = get_agent_trajectory(s.agent_bank_angle, m)
     x, y = normalize_agent_coordinates(s.agent_pos_x, s.agent_pos_y, m.base_grid_element_length)
-    title = t == nothing ? "base map with plane trajectory" : "base map with plane trajectory t=$t"
+    title = t == nothing ? "ore map with plane trajectory" : "ore map with plane trajectory t=$t"
     p = plot_map(s.ore_map, title)
     add_agent_trajectory_to_plot!(p, x, y)
     return p
