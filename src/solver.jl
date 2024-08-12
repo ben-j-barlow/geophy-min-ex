@@ -329,23 +329,9 @@ function get_next_baseline_coord(p::BaselineGeophysicalPolicy, b::MEBelief)
     if length(b.acts) == 0  
         # first move: return init coordinates
         return p.init_coords
-    elseif length(b.acts) == 1
-        # second move: head north
-        a_ = b.acts[end]
-        x_, y_ = a_.coords[2], a_.coords[1]
-        head_north = true
-
-        return calculate_move(x_, y_, head_north, p.max_coord, p.smooth_move_size, p.smooth_sidestep_size)
-    else
-        a_ = b.acts[end]
-        a__ = b.acts[end-1]
-        # calculate direction
-        x_, y_ = a_.coords[2], a_.coords[1]
-        y__ = a__.coords[1]
-        head_north = y_ > y__
-
-        return calculate_move(x_, y_, head_north, p.max_coord, p.smooth_move_size, p.smooth_sidestep_size)
-    end
+  
+    init_x = p.init_coords[2]
+    return calculate_move(init_x, p.max_coord, p.smooth_move_size, p.smooth_sidestep_size, length(b.acts))
 end
 
 function calculate_move(x::Int64, y::Int64, head_north::Bool, max_coord::Int64, smooth_move_size::Int64, sidestep_size::Int64)
@@ -368,4 +354,32 @@ function calculate_move(x::Int64, y::Int64, head_north::Bool, max_coord::Int64, 
             return nothing
         end
     end
+end
+
+
+function calculate_move(init_x::Int64, max_coord::Int64, smooth_move_size::Int64, smooth_sidestep_size::Int64, num_actions::Int64)
+    # Determine the number of steps in each column
+    moves_in_column = floor(Int, max_coord / smooth_move_size)
+
+    # Determine how many complete columns we've finished
+    completed_columns = div(num_actions, moves_in_column)
+
+    # Determine the position within the current column
+    steps_in_current_column = mod(num_actions, moves_in_column)
+
+    # Determine the direction of travel: north for odd columns, south for even columns
+    head_north = mod(completed_columns, 2) == 0
+    
+    # Calculate the new x position after sidesteps
+    new_x = init_x + completed_columns * smooth_sidestep_size
+
+    # If we exceed the max_coord after sidesteps, return nothing to stop the movement
+    if new_x > max_coord
+        return nothing
+    end
+
+    # Calculate the new y position based on direction
+    new_y = head_north ? (1 + steps_in_current_column * smooth_move_size) : (max_coord - steps_in_current_column * smooth_move_size)
+
+    return CartesianIndex(new_y, new_x)
 end

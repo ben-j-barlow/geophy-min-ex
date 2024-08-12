@@ -446,8 +446,8 @@ function POMDPs.actions(m::MineralExplorationPOMDP, s::MEState; verbose::Bool=fa
             end
             for i=1:n_obs
                 coord = s.rock_obs.coordinates[:, i + n_initial]
-                x = Int64(coord[1])
-                y = Int64(coord[2])
+                y = Int64(coord[1])
+                x = Int64(coord[2])
                 keepout = collect(CartesianIndices((x-m.delta:x+m.delta,y-m.delta:y+m.delta)))
                 keepout_acts = OrderedSet([MEAction(coords=coord) for coord in keepout])
                 setdiff!(action_set, keepout_acts)
