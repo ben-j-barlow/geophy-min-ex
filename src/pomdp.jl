@@ -295,6 +295,29 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
     return (sp=sp, o=obs, r=r)
 end
 
+function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)
+    if a.type == :fly
+        if is_empty(o.geophysical_obs) # no observation at this timestep
+            r = -m.out_of_bounds_cost
+        else  # observation received
+            tol = 0
+            plane_in_region = check_plane_within_region(m, last(s.agent_pos_x), last(s.agent_pos_y), tol)
+            plane_in_region_p = check_plane_within_region(m, last(sp.agent_pos_x), last(sp.agent_pos_y), tol)
+            if plane_in_region && plane_in_region_p  # observations made consecutively
+                gradient = abs(sp.geophysical_obs.reading[end] - s.geophysical_obs[end])
+                r = - 1 / (gradient * 100)
+            else
+                r = 0
+            end
+        end
+    else
+        if a.type == :mine
+            r = extraction_reward(m, s)
+        end
+    end
+        return r
+end
+    
 
 function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
     #@info "POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)"
@@ -571,8 +594,8 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
         
             # generate observation
             #@info "smooth map coordinates $(x_smooth_map), $(y_smooth_map)"
-            #obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
-            obs = geophysical_obs(x_base_map, y_base_map, s.ore_map, m.geophysical_noise_std_dev)
+            obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
+            #obs = geophysical_obs(x_base_map, y_base_map, s.ore_map, m.geophysical_noise_std_dev)
             push!(tmp_go.reading, deepcopy(obs))
             tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[y_smooth_map x_smooth_map], 2, 1))
             tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[y_base_map x_base_map], 2, 1))
