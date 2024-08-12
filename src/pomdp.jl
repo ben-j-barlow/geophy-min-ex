@@ -211,14 +211,16 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         #@info "chosen action is $(a.type)"
     end
 
-    if a ∉ POMDPs.actions(m, s)  # has no check on confidence when stop is chosen in geophysical case
-        if a.type == :fly
-            @info "Invalid Action (in POMPDs.gen) $(a.change_in_bank_angle) given current_bank_angle $(last(s.agent_bank_angle))"
-        else
-            @info "Invalid Action in POMPDs.gen is $(a.type)"
+    if a.type != :fake_fly # action checks not implemented for fake fly
+        if a ∉ POMDPs.actions(m, s)  # has no check on confidence when stop is chosen in geophysical case
+            if a.type == :fly
+                @info "Invalid Action (in POMPDs.gen) $(a.change_in_bank_angle) given current_bank_angle $(last(s.agent_bank_angle))"
+            else
+                @info "Invalid Action in POMPDs.gen is $(a.type)"
+            end
+            _ = POMDPs.actions(m, s, verbose=true)
+            error("invalid action")
         end
-        _ = POMDPs.actions(m, s, verbose=true)
-        error("invalid action")
     end
     stopped = s.stopped
     decided = s.decided
@@ -285,7 +287,33 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, new_bank_angle)
 
         # create dummy variable
-        rock_obs_p = deepcopy(s.rock_obs)
+        rock_obs_p = s.rock_obs
+    elseif a_type == :fake_fly
+        if m.observations_per_timestep > 1
+            error("assumed one obs per timestep")
+        end
+        # find coords and get reading
+        x_smooth_map = a.coords[2]  # correspond to smooth coordinates
+        y_smooth_map = a.coords[1]
+        x_base_map, y_base_map = convert_smooth_map_to_base_map_coordinates(x_smooth_map, y_smooth_map, m.upscale_factor)
+        reading = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
+        
+        # prepare GeophysicalObservations object
+        current_geophysical_obs = GeophysicalObservations()
+        push!(current_geophysical_obs.reading, reading)
+        current_geophysical_obs.smooth_map_coordinates = reshape(Int64[y_smooth_map x_smooth_map], 2, 1)
+        current_geophysical_obs.base_map_coordinates = reshape(Int64[y_base_map x_base_map], 2, 1)
+
+        # prepare state and observation objects
+        stopped_p = false
+        decided_p = false
+        
+        geo_obs_p = append_geophysical_obs_sequence(deepcopy(s.geophysical_obs), current_geophysical_obs)
+        heading_p, pos_x_p, pos_y_p, bank_angle_p = m.init_heading, [m.init_pos_x], [m.init_pos_y], [m.init_bank_angle]
+        obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x_p[1], pos_y_p[1], bank_angle_p[1])
+
+        # prepare dummy variables
+        rock_obs_p = s.rock_obs
     else
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
@@ -344,6 +372,8 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
                 r = - (m.fly_cost + m.out_of_bounds_cost)
                 #@info "negative flying cost with out of bounds cost $(r)"
             end
+        elseif a_type == :fake_fly
+            r = -m.fly_cost
         elseif a_type == :mine
             r = extraction_reward(m, s)
             #@info "mining so positive extraction reward $(r)"
@@ -433,7 +463,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, s::MEState; verbose::Bool=fa
                 @info "actions: add stop"
             end
             push!(acts, MEAction(type=:stop))
-            return collect(acts)
+            return acts
         else
             error("Invalid Mineral Exploration Mode: $(m.mineral_exploration_mode)")
         end
@@ -443,7 +473,7 @@ end
 
 function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
                     a::MEAction, sp::MEState, o::MEObservation)
-    #@info "POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)"
+    @info "POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)"
     # this function tries to capture the likelihood of observing a particular magnitude of noise
     # the value of noise is the difference between the observation and the mainbody value at the location
 
@@ -629,4 +659,11 @@ end
 
 function is_empty(obs::GeophysicalObservations)
     return length(obs.reading) == 0
+end
+
+function convert_smooth_map_to_base_map_coordinates(smooth_x::Int64, smooth_y::Int64, upscale_factor::Int64)
+    # Convert coordinates from upscaled map to base map
+    base_x = ceil(Int, smooth_x / upscale_factor)
+    base_y = ceil(Int, smooth_y / upscale_factor)
+    return base_x, base_y
 end

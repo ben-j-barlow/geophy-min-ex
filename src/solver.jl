@@ -289,3 +289,83 @@ function POMDPs.action(p::GridPolicy, b::MEBelief)
         return MEAction(coords=coords)
     end
 end
+
+
+struct BaselineGeophysicalPolicy <: Policy
+    m::MineralExplorationPOMDP
+    max_coord::Int64
+    smooth_move_size::Int64
+    smooth_sidestep_size::Int64
+    init_coords::CartesianIndex{2}
+    early_stop::Bool
+end
+
+
+function POMDPs.action(p::BaselineGeophysicalPolicy, b::MEBelief)
+    #@info "POMDPs.action(p::GridPolicy, b::MEBelief)"
+    if b.stopped
+        vols = [calc_massive(p.m, s) for s in b.particles]
+        mean_vols = round(mean(vols), digits=2)
+        if mean_vols >= p.m.extraction_cost
+            return MEAction(type=:mine)
+        else
+            return MEAction(type=:abandon)
+        end
+    end
+
+    if p.early_stop && calculate_stop_bound(p.m, b)
+        return MEAction(type=:stop)
+    end
+
+    coords_p = get_next_baseline_coord(p, b)
+    if coords_p == nothing
+        return MEAction(type=:stop)
+    else
+        return MEAction(type=:fake_fly, coords=coords_p)
+    end
+end
+
+function get_next_baseline_coord(p::BaselineGeophysicalPolicy, b::MEBelief)
+    if length(b.acts) == 0  
+        # first move: return init coordinates
+        return p.init_coords
+    elseif length(b.acts) == 1
+        # second move: head north
+        a_ = b.acts[end]
+        x_, y_ = a_.coords[2], a_.coords[1]
+        head_north = true
+
+        return calculate_move(x_, y_, head_north, p.max_coord, p.smooth_move_size, p.smooth_sidestep_size)
+    else
+        a_ = b.acts[end]
+        a__ = b.acts[end-1]
+        # calculate direction
+        x_, y_ = a_.coords[2], a_.coords[1]
+        y__ = a__.coords[1]
+        head_north = y_ > y__
+
+        return calculate_move(x_, y_, head_north, p.max_coord, p.smooth_move_size, p.smooth_sidestep_size)
+    end
+end
+
+function calculate_move(x::Int64, y::Int64, head_north::Bool, max_coord::Int64, smooth_move_size::Int64, sidestep_size::Int64)
+    # if move will stay in bounds, increase y according to move size
+    direction = head_north ? 1 : -1
+    candiate_y = y + (direction * smooth_move_size)
+    
+    if candiate_y <= max_coord && candiate_y >= 1
+        return CartesianIndex(candiate_y, x)
+    else
+        candidate_x = x + smooth_sidestep_size
+        if candidate_x <= max_coord && candidate_x >= 1
+            # change direction
+            head_north_p = !head_north
+
+            # calculate start point (top or bottom of grid)
+            y = head_north_p ? 1 : max_coord
+            return CartesianIndex(y, candidate_x)
+        else
+            return nothing
+        end
+    end
+end

@@ -100,7 +100,8 @@ export
         RandomSolver,
         GridPolicy,
         leaf_estimation,
-        geophysical_leaf_estimation
+        geophysical_leaf_estimation,
+        BaselineGeophysicalPolicy
 include("solver.jl")
 
 export
