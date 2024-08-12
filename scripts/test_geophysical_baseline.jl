@@ -84,8 +84,13 @@ p = plot_map(s0.smooth_map, "smooth map");
 plot!(p, x_to_plot, y_to_plot, lw=2)
 
 
-for coord in coords
-    println(coord)
-end
+plot(final_belief)
+
+using Plots
+using PlotUtils
+using Images
+
+png_path = "/Users/benbarlow/dev/MineralExploration/img/plane.png"
+
 
 
