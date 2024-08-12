@@ -1,89 +1,135 @@
+# Import necessary packages
 using Revise
-
 using POMDPs
 using POMDPSimulators
 using POMCPOW
 using Plots
-using POMDPModelTools
 using ParticleFilters
 using Statistics
-using Random
-using Dates
-
 using MineralExploration
 
-C_EXP = 2
-
+# Constants for the problem setup
+GRID_DIMS = (30, 30, 1)
+N_TRIALS = 10
+NOISE_FOR_PERTURBATION = 0.3
 N_PARTICLES = 1000
-NOISE_FOR_PERTURBATION = 2.0
+C_EXP = 100
 
-# define max number of timesteps here
-hr = HistoryRecorder(max_steps=10)
 
-# prepare POMCPOW
-solver = POMCPOWSolver(
-    tree_queries=4000,
-    k_observation=2.0,
-    alpha_observation=0.1,
-    max_depth=5,
-    check_repeat_obs=true,
-    check_repeat_act=true,
-    enable_action_pw=false,
-    #next_action=nothing,
-    #alpha_action=nothing,
-    #k_action=nothing,
-    criterion=POMCPOW.MaxUCB(C_EXP),
-    final_criterion=POMCPOW.MaxQ(),
-    estimate_value=leaf_estimation,
-    tree_in_info=true,
+# Create a POMDP model for mineral exploration with specified parameters
+m = MineralExplorationPOMDP(
+    c_exp=C_EXP
 )
 
-START_X = [30.0, 30.0, 25.1*40.1, 25.1*25.1]
-START_Y = [30.0, 25.1*50.1-30, 25.1*40.1, 25,1*25.1]
-INIT_HEADING = [HEAD_NORTH, HEAD_SOUTH, HEAD_EAST, HEAD_WEST]
+# Initialize the state distribution for the POMDP model
+ds0 = POMDPs.initialstate(m)
 
-path_map = []
-volumes = []
+# Define the belief updater for the POMDP with 1000 particles and a spread factor of 2.0
+up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION)
+b0 = POMDPs.initialize_belief(up, ds0)
 
-start_time = now();
-h = nothing
-for i in 1:4
-    @info "iteration $i"
-    m = MineralExplorationPOMDP(
-        init_heading=INIT_HEADING[i],
-        init_pos_x=START_X[i],
-        init_pos_y=START_Y[i],
-        out_of_bounds_cost=50,
-        geophysical_noise_std_dev=convert(Float64, 0.0),
-        observations_per_timestep=1,
-        timestep_in_seconds=1,
-        bank_angle_intervals=10,
-        max_bank_angle=55,
-        velocity=25,
-        base_grid_element_length=25.0
-    )
-    up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION) #Checked
-    ds0 = POMDPs.initialstate(m)
-    b0 = POMDPs.initialize_belief(up, ds0); #Checked
+# Set up the POMCPOW solver with specific parameters
+solver = get_geophysical_solver(C_EXP)
 
-    Random.seed!(42)
-    s0 = rand(ds0);
+# Solve the POMDP problem using the defined solver
+planner = POMDPs.solve(solver, m)
 
-    planner = POMDPs.solve(solver, m)
-    h = simulate(hr, m, planner, up, b0, s0) #ds0 instead of b0?
+# Initialize data storage and simulator for the results
+# rs = RolloutSimulator(max_steps=MAX_BORES+5)
+hr = HistoryRecorder(max_steps=m.max_timesteps+3)  # Record history of the simulation
+DIS_RETURN = Float64[]  # Array to store discounted returns
+ORES = Float64[]  # Array to store ore values
+N_FLY = Int64[]  # Array to store the number of drills used
+FINAL_ACTION = Symbol[]  # Array to store the final action taken
+ME = Vector{Float64}[]  # Array to store mean errors
+STD = Vector{Float64}[]  # Array to store standard deviations
+println("Starting simulations")
 
-    push!(path_map, plot_smooth_map_and_plane_trajectory(h[end][:sp], m))
+# Run the simulation for N trials
+for i in 1:N_TRIALS
+    if (i % 1) == 0
+        println("Trial $i")
+    end
+    s0 = rand(ds0, apply_scale=true)  # Sample a starting state
+    s_massive = s0.ore_map .>= m.massive_threshold  # Identify massive ore locations
+    @assert m.dim_scale == 1
+    r_massive = sum(s_massive)  # Calculate total massive ore
+    println("Massive Ore: $r_massive")
+    
+    # Simulate a sequence of actions and states
+    h = simulate(hr, m, planner, up, b0, s0)
+    
+    v = 0.0  # Initialize the return
+    n_fly = 0  # Initialize the fly count
+    
+    # Calculate the discounted return and count drills
+    for stp in h
+        v += POMDPs.discount(m)^(stp[:t] - 1) * stp[:r]
+        if stp[:a].type == :fly
+            n_fly += 1
+        end
+    end
+    
+    # Store the results
+    push!(N_FLY, n_fly)
+    push!(FINAL_ACTION, h[end][:a].type)
+    
+    errors = Float64[]  # Array to store errors
+    stds = Float64[]  # Array to store standard deviations
+    
+    # Calculate errors and standard deviations for each step
+    for step in h
+        bp = step[:bp]
+        b_vol = [calc_massive(m, p) for p in bp.particles]
+        push!(errors, mean(b_vol .- r_massive))
+        push!(stds, std(b_vol))
+    end
+    
+    # Store errors and standard deviations
+    push!(ME, errors)
+    push!(STD, stds)
+    
+    println("Steps: $(length(h))")
+    println("Decision: $(h[end][:a].type)")
+    println("======================")
+    
+    # Store ore value and discounted return
+    push!(ORES, r_massive)
+    push!(DIS_RETURN, v)
 
-    r_massive = sum(s0.ore_map .>= m.massive_threshold)
-    hist_start, _, _, _ = plot_volume(m, b0, r_massive; t="start")
-    hist_end, _, _, _ = plot_volume(m, h[end][:bp], r_massive; t="end")
-    push!(volumes, hist_start)
-    push!(volumes, hist_end)
+    GC.gc()
 end
-end_time = now();
-elapsed_time = end_time - start_time;
 
-#plot(volumes..., layout=(2, 2), size=(800, 800))
+# Post-processing: Calculate profits and statistics based on simulation results
 
+# mean_v = mean(V)
+# se_v = std(V) / sqrt(N)
+# println("Discounted Return: $mean_v ± $se_v")
 
-#plot(path_map[1], path_map[2], path_map[3], path_map[4], layout=(2, 2), size=(800, 800))
+abandoned = [a == :abandon for a in FINAL_ACTION]
+mined = [a == :mine for a in FINAL_ACTION]
+
+profitable = ORES .> m.extraction_cost
+lossy = ORES .<= m.extraction_cost
+
+n_profitable = sum(profitable)
+n_lossy = sum(lossy)
+
+profitable_mined = sum(mined .* profitable)
+profitable_abandoned = sum(abandoned .* profitable)
+
+lossy_mined = sum(mined .* lossy)
+lossy_abandoned = sum(abandoned .* lossy)
+
+mined_profit = sum(mined .* (ORES .- m.extraction_cost))
+available_profit = sum(profitable .* (ORES .- m.extraction_cost))
+
+mean_flys = mean(N_FLY)
+mined_flys = sum(N_FLY .* mined) / sum(mined)
+abandoned_flys = sum(N_FLY .* abandoned) / sum(abandoned)
+
+# Print the final statistics and results
+println("Available Profit: $available_profit, Mined Profit: $mined_profit")
+println("Profitable: $(sum(profitable)), Mined: $profitable_mined, Abandoned: $profitable_abandoned")
+println("Lossy: $(sum(lossy)), Mined: $lossy_mined, Abandoned: $lossy_abandoned")
+println("Mean Bores: $mean_flys, Mined Flys: $mined_flys, Abandon Flys: $abandoned_flys")
