@@ -3,6 +3,7 @@
 using MineralExploration
 using Plots
 using Random
+using POMDPSimulators
 using POMDPs
 using POMDPModelTools
 
@@ -22,17 +23,26 @@ NOISE_FOR_PERTURBATION = 0.1
 
 # setup
 m = MineralExplorationPOMDP(
-    init_pos_x=30 * 25.0, # cell 31
-    init_pos_y=20, # cell 0 (outside grid so first flight will be to cell 1)
-    init_heading=HEAD_NORTH,
-    init_bank_angle=0,
-    base_grid_element_length=25,
-    velocity=25,
-    out_of_bounds_cost=0.5,
-    geophysical_noise_std_dev=convert(Float64, 0.0),
-    observations_per_timestep=1,
-    timestep_in_seconds=1
+    grid_dim = (50, 50, 1),
+    c_exp = 100.0,
+    base_grid_element_length = 40.0,
+    upscale_factor = 4,
+    sigma = 5,
+    geophysical_noise_std_dev = 0.01,
+    fly_cost = 0.01,
+    out_of_bounds_cost = 0.0,
+    out_of_bounds_tolerance = 0,
+    init_pos_x = 62.5,
+    init_pos_y = 0.0,
+    init_heading = HEAD_NORTH,
+    max_bank_angle = 55,
+    bank_angle_intervals = 15,
+    velocity = 50,
+    extraction_cost = 150.0,
+    extraction_lcb = 0.3,
+    extraction_ucb = 0.3
 )
+
 up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION)
 ds0 = POMDPs.initialstate(m)
 b0 = POMDPs.initialize_belief(up, ds0);
@@ -40,10 +50,11 @@ Random.seed!(42)
 s0 = rand(ds0, save_dir=save_dir);
 a = MEAction(type=:fly, change_in_bank_angle=0);
 
-plot(b0)
+solver = get_geophysical_solver(m.c_exp)
+planner = POMDPs.solve(solver, m)
 
 # fly straight
-a = MEAction(type=:fly, change_in_bank_angle=0)
+#a = MEAction(type=:fly, change_in_bank_angle=0)
 
 b = b0;
 s = s0;
@@ -74,12 +85,13 @@ savefig(p, string(save_dir, "0volume.png"))
 empty!(p)
 
 for i in 1:50
+    a = action_info(planner, b0)
     out = gen(m, s, a, m.rng);
     o = out[:o];
     sp = out[:sp];
     bp, ui = update_info(up, b, a, o);
 
-    if i % 5 == 0
+    if i % 1 == 0
         p, _, mn, std = plot_volume(m, bp, r_massive, t=i, verbose=false)
         @info "Vols at time $i: $mn ± $std"
         savefig(p, string(save_dir, "$(i)volume.png"))
@@ -102,3 +114,26 @@ for i in 1:50
 end
 
 
+
+hr = HistoryRecorder(max_steps=m.max_timesteps+3)  # Record history of the simulation
+h = simulate(hr, m, planner, up, b0, s0)
+
+v = 0.0  # Initialize the return
+n_fly = 0  # Initialize the fly count
+
+states = []
+beliefs = []
+
+# Calculate the discounted return and count drills
+for stp in h
+    v += POMDPs.discount(m)^(stp[:t] - 1) * stp[:r]
+    if stp[:a].type == :fly
+        n_fly += 1
+    end
+    b = step[:b]
+    s = step[:sp]
+    # push!(states, )
+    # push(beliefs)
+end
+
+final_action = h[end][:a].type
