@@ -158,12 +158,12 @@ abstract type MainbodyGen end
     true_mainbody_gen::MainbodyGen = BlobNode(grid_dims=high_fidelity_dim) # high-fidelity true mainbody generator
     mainbody_gen::MainbodyGen = BlobNode(grid_dims=grid_dim)
     rng::AbstractRNG = Random.GLOBAL_RNG
-    c_exp::Float64 = 2.0
+    c_exp::Float64 = 100.0
 
     base_grid_element_length::Float64 = 25.0 # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
-    upscale_factor::Int = 5  # factor to upscale the grid by for smooth, higher resolution map
+    upscale_factor::Int = 3  # factor to upscale the grid by for smooth, higher resolution map
     smooth_grid_element_length::Float64 = base_grid_element_length / upscale_factor
-    sigma::Float64 = 10  # for smoothing map with gaussian filter
+    sigma::Float64 = 3  # for smoothing map with gaussian filter
     geophysical_noise_std_dev::Float64 = 0.01
     max_timesteps::Int = 100
     mineral_exploration_mode = "geophysical" # borehole or geophysical
@@ -207,7 +207,7 @@ struct MEInitStateDist  # prior over state space
 end
 
 # prepare POMCPOW
-function get_geophysical_solver(c_exp::Int64, get_tree::Bool=false)
+function get_geophysical_solver(c_exp::Float64, get_tree::Bool=false)
     return POMCPOWSolver(
         tree_queries=10000,
         k_observation=2.0,
