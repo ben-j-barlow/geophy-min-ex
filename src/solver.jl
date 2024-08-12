@@ -329,7 +329,7 @@ function get_next_baseline_coord(p::BaselineGeophysicalPolicy, b::MEBelief)
     if length(b.acts) == 0  
         # first move: return init coordinates
         return p.init_coords
-  
+    end
     init_x = p.init_coords[2]
     return calculate_move(init_x, p.max_coord, p.smooth_move_size, p.smooth_sidestep_size, length(b.acts))
 end
