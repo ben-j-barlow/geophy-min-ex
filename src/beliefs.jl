@@ -235,8 +235,6 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     dummy_geo_obs = GeophysicalObservations() # used to force multiple dispatch to the correct method
 
     for s in sampled_particles
-        gp_map = s.ore_map - s.mainbody_map  # gp represents noise linking the mainbody map to smooth map
-
         # perform perturbation
         mainbody_param = s.mainbody_params
         mainbody_map = s.mainbody_map
@@ -406,7 +404,7 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     elseif up.m.mineral_exploration_mode == "geophysical"
         bp_rock = deepcopy(b.rock_obs) # create dummy variable ahead of instantiation of MEBelief
 
-        if a.type == :fly && !is_empty(o.geophysical_obs)
+        if (a.type == :fly && !is_empty(o.geophysical_obs)) || a.type == :fake_fly
             bp_geophysical_obs = append_geophysical_obs_sequence(b.geophysical_obs, o.geophysical_obs)            
             bp_dedupe_geophysical_obs = aggregate_base_map_duplicates(bp_geophysical_obs)
 
