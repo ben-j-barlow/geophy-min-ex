@@ -705,7 +705,10 @@ end
 
 
 
-function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
+function Plots.plot(b::MEBelief, t=nothing; axis=nothing, cmap=:viridis, return_individual=false)
+    if axis == nothing
+        axis = false
+    end
     #@info "Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)"
     mean, var = summarize(b)
     if t == nothing
@@ -717,8 +720,8 @@ function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
     end
     xl = (1, size(mean, 1))
     yl = (1, size(mean, 2))
-    fig1 = heatmap(mean[:, :, 1], title=mean_title, fill=true, clims=(0.0, 1.0), legend=:none, ratio=1, c=cmap, xlims=xl, ylims=yl)
-    fig2 = heatmap(sqrt.(var[:, :, 1]), title=std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=cmap, xlims=xl, ylims=yl)
+    fig1 = heatmap(mean[:, :, 1], title=mean_title, fill=true, clims=(0.0, 1.0), legend=:none, ratio=1, c=cmap, xlims=xl, ylims=yl, axis=axis)
+    fig2 = heatmap(sqrt.(var[:, :, 1]), title=std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=cmap, xlims=xl, ylims=yl, axis=axis)
     if !isempty(b.rock_obs.ore_quals)
         x = b.rock_obs.coordinates[2, :]
         y = b.rock_obs.coordinates[1, :]
@@ -732,6 +735,15 @@ function Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)
                 plot!(fig1, x, y, arrow=:closed, color=:black)
             end
         end
+    end
+    if !is_empty(b.geophysical_obs)
+        x = b.geophysical_obs.base_map_coordinates[2, :]
+        y = b.geophysical_obs.base_map_coordinates[1, :]
+        plot!(fig1, x, y, seriestype=:scatter)
+        #plot!(fig2, x, y, seriestype=:scatter)
+    end
+    if return_individual
+        return fig1, fig2
     end
     fig = plot(fig1, fig2, layout=(1, 2), size=(600, 250))
     return fig
