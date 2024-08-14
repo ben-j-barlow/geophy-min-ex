@@ -8,6 +8,7 @@ using DelimitedFiles
 using Distributions
 using Distances # for KL and JS
 using GeoStats
+using Glob
 using ImageFiltering
 using Infiltrator # for debugging
 using Interpolations
@@ -144,5 +145,12 @@ export
         prepare_logger,
         close_logger
 include("logging.jl")
+
+export 
+        write_baseline_result_to_file,
+        write_intelligent_result_to_file,
+        get_uncompleted_seeds,
+        get_all_seeds
+include("experiment_utils.jl")
 
 end
