@@ -225,12 +225,14 @@ function geophysical_leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState,
     # prepare return value
     if s.decided
         return 0.0
-    elseif !check_plane_within_region(pomdp, last(s.agent_pos_x), last(s.agent_pos_y))
-        return -100.0
     else
         r_extract = extraction_reward(pomdp, s)
         if r_extract >= 0.0
-            return γ*r_extract*0.9
+            if check_plane_within_region(pomdp, last(s.agent_pos_x), last(s.agent_pos_y), 0)
+                return γ*r_extract*0.9
+            else
+                return 0 # penalty for going out of region
+            end
         else
             return γ*r_extract*0.1
         end
@@ -291,15 +293,24 @@ function POMDPs.action(p::GridPolicy, b::MEBelief)
 end
 
 
-struct BaselineGeophysicalPolicy <: Policy
+mutable struct BaselineGeophysicalPolicy <: Policy
     m::MineralExplorationPOMDP
     max_coord::Int64
     smooth_move_size::Int64
     smooth_sidestep_size::Int64
     init_coords::CartesianIndex{2}
     early_stop::Bool
-end
+    moves::Vector{MEAction}  # Field to store all the moves
+    current_move::Int64  # Field to track the current move
+    grid::Bool
 
+    # Inner constructor
+    function BaselineGeophysicalPolicy(m::MineralExplorationPOMDP, max_coord::Int64, smooth_move_size::Int64, smooth_sidestep_size::Int64, init_coords::CartesianIndex{2}, early_stop::Bool, grid::Bool)
+        instance = new(m, max_coord, smooth_move_size, smooth_sidestep_size, init_coords, early_stop, Vector{MEAction}(), 1, grid)
+        instance.moves = get_all_moves(instance)
+        return instance
+    end
+end
 
 function POMDPs.action(p::BaselineGeophysicalPolicy, b::MEBelief)
     #@info "POMDPs.action(p::GridPolicy, b::MEBelief)"
@@ -317,12 +328,10 @@ function POMDPs.action(p::BaselineGeophysicalPolicy, b::MEBelief)
         return MEAction(type=:stop)
     end
 
-    coords_p = get_next_baseline_coord(p, b)
-    if coords_p == nothing
-        return MEAction(type=:stop)
-    else
-        return MEAction(type=:fake_fly, coords=coords_p)
-    end
+    # Return the next action from the moves list
+    action = deepcopy(p.moves[p.current_move])
+    p.current_move += 1  # Increment the counter
+    return action
 end
 
 function get_next_baseline_coord(p::BaselineGeophysicalPolicy, b::MEBelief)
@@ -334,52 +343,46 @@ function get_next_baseline_coord(p::BaselineGeophysicalPolicy, b::MEBelief)
     return calculate_move(init_x, p.max_coord, p.smooth_move_size, p.smooth_sidestep_size, length(b.acts))
 end
 
-function calculate_move(x::Int64, y::Int64, head_north::Bool, max_coord::Int64, smooth_move_size::Int64, sidestep_size::Int64)
-    # if move will stay in bounds, increase y according to move size
-    direction = head_north ? 1 : -1
-    candiate_y = y + (direction * smooth_move_size)
+function get_all_moves(p::BaselineGeophysicalPolicy)
+    init_x = p.init_coords[2]
     
-    if candiate_y <= max_coord && candiate_y >= 1
-        return CartesianIndex(candiate_y, x)
+    vertical_moves = [p.init_coords]
+    num_actions = 1
+    new_x = 1
+    
+    while new_x < p.max_coord
+        # Determine the number of steps in each column
+        moves_in_column = floor(Int, p.max_coord / p.smooth_move_size)
+
+        # Determine how many complete columns we've finished
+        completed_columns = div(num_actions, moves_in_column)
+
+        # Determine the position within the current column
+        steps_in_current_column = mod(num_actions, moves_in_column)
+
+        # Determine the direction of travel: north for odd columns, south for even columns
+        head_north = mod(completed_columns, 2) == 0
+        
+        # Calculate the new x position after sidesteps
+        new_x = init_x + completed_columns * p.smooth_sidestep_size
+        
+        # Calculate new _y
+        new_y = head_north ? (1 + steps_in_current_column * p.smooth_move_size) : (p.max_coord - steps_in_current_column * p.smooth_move_size)
+        push!(vertical_moves, CartesianIndex(new_y, new_x))
+
+        num_actions += 1
+    end
+    
+    horizontal_moves = [CartesianIndex(m[2], m[1]) for m in vertical_moves]
+
+    vertical_lines = MEAction[MEAction(type=:fake_fly, coords=coord) for coord in vertical_moves]
+
+    if p.grid
+        horizontal_lines = MEAction[MEAction(type=:fake_fly, coords=coord) for coord in horizontal_moves]
+        all_lines = vcat(vertical_lines, horizontal_lines)
     else
-        candidate_x = x + smooth_sidestep_size
-        if candidate_x <= max_coord && candidate_x >= 1
-            # change direction
-            head_north_p = !head_north
-
-            # calculate start point (top or bottom of grid)
-            y = head_north_p ? 1 : max_coord
-            return CartesianIndex(y, candidate_x)
-        else
-            return nothing
-        end
+        all_lines = vertical_lines
     end
-end
-
-
-function calculate_move(init_x::Int64, max_coord::Int64, smooth_move_size::Int64, smooth_sidestep_size::Int64, num_actions::Int64)
-    # Determine the number of steps in each column
-    moves_in_column = floor(Int, max_coord / smooth_move_size)
-
-    # Determine how many complete columns we've finished
-    completed_columns = div(num_actions, moves_in_column)
-
-    # Determine the position within the current column
-    steps_in_current_column = mod(num_actions, moves_in_column)
-
-    # Determine the direction of travel: north for odd columns, south for even columns
-    head_north = mod(completed_columns, 2) == 0
-    
-    # Calculate the new x position after sidesteps
-    new_x = init_x + completed_columns * smooth_sidestep_size
-
-    # If we exceed the max_coord after sidesteps, return nothing to stop the movement
-    if new_x > max_coord
-        return nothing
-    end
-
-    # Calculate the new y position based on direction
-    new_y = head_north ? (1 + steps_in_current_column * smooth_move_size) : (max_coord - steps_in_current_column * smooth_move_size)
-
-    return CartesianIndex(new_y, new_x)
+    # concat the two lists and add a stop action
+    return vcat(all_lines, MEAction(type=:stop))
 end
