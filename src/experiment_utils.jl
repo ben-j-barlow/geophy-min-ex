@@ -1,14 +1,14 @@
 using Glob
 
-write_baseline_result_to_file(m, final_belief, final_state; n_fly, reward, seed, r_massive, grid, which_map=:base) = write_result_to_file(m, final_belief, final_state; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=true, grid, which_map=which_map)
-write_intelligent_result_to_file(m, final_belief, final_state; n_fly, reward, seed, r_massive, which_map=:smooth) = write_result_to_file(m, final_belief, final_state; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=false, nothing, which_map=which_map)
+write_baseline_result_to_file(m, final_belief, final_state; n_fly, reward, seed, r_massive, grid, which_map=:base) = write_result_to_file(m, final_belief, final_state; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=true, grid=grid, which_map=which_map)
+write_intelligent_result_to_file(m, final_belief, final_state; n_fly, reward, seed, r_massive, which_map=:smooth) = write_result_to_file(m, final_belief, final_state; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=false, grid=nothing, which_map=which_map)
 function write_result_to_file(m, final_belief, final_state; n_fly, reward, seed, r_massive, baseline, grid, which_map=:base)
     dir = get_results_dir(baseline=baseline)
     b_hist, vols, mn, std = plot_volume(m, final_belief, r_massive; verbose=false)
 
     # vertical lines setup
     coords = [final_belief.acts[i].coords for i in 1:(length(final_belief.acts) - 2)];
-    #vertical_line_x_coords = unique([c[2] for c in coords]);
+    #vertical_line_x_coords = unique([c[2] for c in coords])
 
     # plot map
     if which_map == :smooth
