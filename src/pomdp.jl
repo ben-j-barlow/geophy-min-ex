@@ -297,6 +297,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         y_smooth_map = a.coords[1]
         x_base_map, y_base_map = convert_smooth_map_to_base_map_coordinates(x_smooth_map, y_smooth_map, m.upscale_factor)
         reading = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
+        #reading = geophysical_obs(x_base_map, y_base_map, s.ore_map, 0.0)
         
         # prepare GeophysicalObservations object
         current_geophysical_obs = GeophysicalObservations()
@@ -473,7 +474,7 @@ end
 
 function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
                     a::MEAction, sp::MEState, o::MEObservation)
-    @info "POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)"
+    #@info "POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)"
     # this function tries to capture the likelihood of observing a particular magnitude of noise
     # the value of noise is the difference between the observation and the mainbody value at the location
 
@@ -526,7 +527,7 @@ function POMDPModelTools.obs_weight(m::MineralExplorationPOMDP, s::MEState,
             if o.geophysical_obs == nothing # mine, abandon, stop lead to == nothing
                 w = 1.0
             elseif is_empty(o.geophysical_obs) # flying outside of region leads to empty GeophysicalObservations
-                w = 0.001
+                w = 1.0
             else
                 error("o.geophysical_reading unexpectedly not nothing")
             end
