@@ -11,7 +11,10 @@ struct MEBeliefUpdater{G} <: POMDPs.Updater
     upscale_factor::Int
 end
 
-function MEBeliefUpdater(m::MineralExplorationPOMDP, n::Int64, noise::Float64=1.0; abc::Bool=false, abc_ϵ::Float64=1e-1, abc_dist::Function=(x, x′) -> abs(x - x′))
+function MEBeliefUpdater(m::MineralExplorationPOMDP, n::Int64, noise::Union{Float64,Int64}=1.0; abc::Bool=false, abc_ϵ::Float64=1e-1, abc_dist::Function=(x, x′) -> abs(x - x′))
+    if typeof(noise) == Int64
+        noise = Float64(noise)
+    end
     geostats = m.geodist_type(m)
     return MEBeliefUpdater(m, geostats, n, noise, abc, abc_ϵ, abc_dist, m.rng, m.sigma, m.upscale_factor)
 end
@@ -705,10 +708,7 @@ end
 
 
 
-function Plots.plot(b::MEBelief, t=nothing; axis=nothing, cmap=:viridis, return_individual=false)
-    if axis == nothing
-        axis = false
-    end
+function Plots.plot(b::MEBelief, t=nothing; axis=false, cmap=:viridis, return_individual=true)
     #@info "Plots.plot(b::MEBelief, t=nothing; cmap=:viridis)"
     mean, var = summarize(b)
     if t == nothing
