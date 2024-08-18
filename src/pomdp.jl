@@ -161,7 +161,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         end
         smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
 
-        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_y)], [d.m.init_bank_angle], GeophysicalObservations())
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_y)], [d.m.init_bank_angle], GeophysicalObservations(), 0)
         push!(states, state)
     end
     if n == 1
@@ -281,7 +281,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         if m.observations_per_timestep > 1
             error("assumes one observation per timestep when calculaing n_reading")
         end
-        stopped_p = n_reading >= m.max_timesteps 
+        stopped_p = s.timestep >= m.max_timesteps 
         decided_p = false
         obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, new_bank_angle)
 
@@ -318,7 +318,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
 
-    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, pos_x_p, pos_y_p, bank_angle_p, geo_obs_p)
+    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, pos_x_p, pos_y_p, bank_angle_p, geo_obs_p, s.timestep+1)
     r = reward(m, s, a)
     return (sp=sp, o=obs, r=r)
 end

@@ -105,6 +105,7 @@ struct MEState{MB}
     agent_pos_y::Vector{Float64}
     agent_bank_angle::Vector{Int64}  # bank angle of agent
     geophysical_obs::GeophysicalObservations
+    timestep::Int64
 end
 
 function Base.length(obs::RockObservations)
@@ -210,7 +211,7 @@ end
 # prepare POMCPOW
 function get_geophysical_solver(c_exp::Float64, get_tree::Bool=false)
     return POMCPOWSolver(
-        tree_queries=10000,
+        tree_queries=20000,
         k_observation=1.5,
         alpha_observation=0.15,
         max_depth=6,

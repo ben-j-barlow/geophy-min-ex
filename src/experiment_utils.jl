@@ -20,7 +20,7 @@ function write_result_to_file(m, final_belief, final_state, means=nothing, stds=
         max_val = m.grid_dim[1]
         #vertical_line_x_coords = [ceil(Int, x / m.upscale_factor) for x in vertical_line_x_coords]
     end
-    title = "$(final_belief.acts[end].type) at t=$(n_fly+1) with belief $mn & truth $r_massive"
+    title = "$(final_belief.acts[end].type) @ t=$(n_fly+1) w b $mn ± $std; truth $r_massive"
     p = plot_map(map_to_plot, title, axis=false)
 
     # if baseline
