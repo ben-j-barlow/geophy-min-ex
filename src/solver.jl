@@ -226,17 +226,16 @@ function geophysical_leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState,
     if s.decided
         return 0.0
     else
-        r_extract = extraction_reward(pomdp, s)
-        if r_extract >= 0.0
-            if check_plane_within_region(pomdp, last(s.agent_pos_x), last(s.agent_pos_y), 0)
-                return γ*r_extract*0.9
+        if check_plane_within_region(pomdp, last(s.agent_pos_x), last(s.agent_pos_y), pomdp.out_of_bounds_tolerance)  
+            r_extract = extraction_reward(pomdp, s)
+            if r_extract >= 0.0    
+                    return γ*r_extract*0.9
             else
-                return 0 # penalty for going out of region
+                return γ*r_extract*0.1
             end
         else
-            return γ*r_extract*0.1
+            return -pomdp.out_of_bounds_cost * distance_from_map(last(s.agent_pos_x), last(s.agent_pos_y), pomdp.grid_dim[1], pomdp)
         end
-        # return γ*r_extract
     end
 end
 

@@ -1,8 +1,9 @@
+using Statistics
 using Glob
 
-write_baseline_result_to_file(m, final_belief, final_state; n_fly, reward, seed, r_massive, grid, which_map=:base) = write_result_to_file(m, final_belief, final_state; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=true, grid=grid, which_map=which_map)
-write_intelligent_result_to_file(m, final_belief, final_state; n_fly, reward, seed, r_massive, which_map=:smooth) = write_result_to_file(m, final_belief, final_state; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=false, grid=nothing, which_map=which_map)
-function write_result_to_file(m, final_belief, final_state; n_fly, reward, seed, r_massive, baseline, grid, which_map=:base)
+write_baseline_result_to_file(m, final_belief, final_state, means, stds; n_fly, reward, seed, r_massive, grid, which_map=:base) = write_result_to_file(m, final_belief, final_state, means, stds; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=true, grid=grid, which_map=which_map)
+write_intelligent_result_to_file(m, final_belief, final_state, means, stds; n_fly, reward, seed, r_massive, which_map=:smooth) = write_result_to_file(m, final_belief, final_state, means, stds; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=false, grid=nothing, which_map=which_map)
+function write_result_to_file(m, final_belief, final_state, means=nothing, stds=nothing; n_fly, reward, seed, r_massive, baseline, grid, which_map=:base)
     dir = get_results_dir(baseline=baseline)
     b_hist, vols, mn, std = plot_volume(m, final_belief, r_massive; verbose=false)
 
@@ -31,19 +32,26 @@ function write_result_to_file(m, final_belief, final_state; n_fly, reward, seed,
     #         end
     #     end
     # else
-    #     x, y = normalize_agent_coordinates(final_state.agent_pos_x, final_state.agent_pos_y, m.base_grid_element_length)
-    #     add_agent_trajectory_to_plot!(p, x, y, add_start=false)
-    # end
+    if !baseline
+        x, y = normalize_agent_coordinates(final_state.agent_pos_x, final_state.agent_pos_y, m.base_grid_element_length)
+        add_agent_trajectory_to_plot!(p, x, y, add_start=false)
+     end
 
     # save map
     type_for_file = which_map == :smooth ? "smooth" : "base"
-    savefig(p, "$(dir)trial_$(seed)_$(type_for_file)_trajectory.png")
+    savefig(p, "$(dir)trial_$(seed)_$(type_for_file)_trajectory.pdf")
+    plot!(p, title="")
+    savefig(p, "$(dir)trial_$(seed)_$(type_for_file)_trajectory_no_title.pdf")
     empty!(p)
 
     # plot and save belief
     p_mean, p_std = plot(final_belief, return_individual=true)
-    savefig(p_mean, "$(dir)trial_$(seed)_beliefmn.png")
-    savefig(p_std, "$(dir)trial_$(seed)_beliefstd.png")
+    # remove title
+    plot!(p_mean, title="")
+    plot!(p_std, title="")
+
+    savefig(p_mean, "$(dir)trial_$(seed)_beliefmn.pdf")
+    savefig(p_std, "$(dir)trial_$(seed)_beliefstd.pdf")
     empty!(p_mean)
     empty!(p_std)
 
@@ -60,6 +68,21 @@ function write_result_to_file(m, final_belief, final_state; n_fly, reward, seed,
         println(io, )
     end
 
+    # write mean and std history
+    if means != nothing
+        open(string(dir, "trial_$(seed)_mn_history.txt"), "w") do io
+            for i in 1:length(means)
+                println(io, "$(means[i])")
+            end
+        end
+    end
+    if stds != nothing
+        open(string(dir, "trial_$(seed)_std_history.txt"), "w") do io
+            for i in 1:length(stds)
+                println(io, "$(stds[i])")
+            end
+        end
+    end
 end
 
 
@@ -71,14 +94,14 @@ end
 
 function get_results_dir(;baseline::Bool)
     if baseline
-        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/baselinegrid/"
+        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/baseline/"
     else
         dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/intelligent/"
     end
     return dir
 end
 
-function get_all_results(;baseline::Bool)
+function get_all_results(;baseline::Bool, dir=nothing)
     # Initialize dictionaries to store extracted values
     DIS_RETURN = Dict{Int, Float64}()
     ORES = Dict{Int, Int}()
@@ -88,8 +111,10 @@ function get_all_results(;baseline::Bool)
     STD_DEV = Dict{Int, Float64}()
     EX_COST = Dict{Int, Float64}()
 
-    dir = get_results_dir(baseline=baseline)
-    txt_files = glob("*.txt", dir)
+    if dir == nothing
+        dir = get_results_dir(baseline=baseline)
+    end
+    txt_files = Glob.glob("*.txt", dir)
 
 
     for file in txt_files
@@ -141,40 +166,50 @@ function output_results(;baseline::Bool)
     
     abandoned = [a == "abandon" for a in FINAL_ACTION]
     mined = [a == "mine" for a in FINAL_ACTION]
-    # Determine categories
-    unprofitable = ORES .< (extraction_cost - 20)
-    borderline_profitable = (ORES .>= (extraction_cost - 20)) .& (ORES .<= (extraction_cost + 20))
-    profitable = ORES .> (extraction_cost + 20)
+    
+    # Determine categories with ±20 cutoff
+    major_unprofitable = ORES .< (extraction_cost - 20)
+    minor_unprofitable = (ORES .>= (extraction_cost - 20)) .& (ORES .< extraction_cost)
+    minor_profitable = (ORES .>= extraction_cost) .& (ORES .<= (extraction_cost + 20))
+    major_profitable = ORES .> (extraction_cost + 20)
 
-    n_unprofitable = sum(unprofitable)
-    n_borderline_profitable = sum(borderline_profitable)
-    n_profitable = sum(profitable)
+    n_major_unprofitable = sum(major_unprofitable)
+    n_minor_unprofitable = sum(minor_unprofitable)
+    n_minor_profitable = sum(minor_profitable)
+    n_major_profitable = sum(major_profitable)
 
-    unprofitable_mined = sum(mined .* unprofitable)
-    unprofitable_abandoned = sum(abandoned .* unprofitable)
+    major_unprofitable_mined = sum(mined .* major_unprofitable)
+    major_unprofitable_abandoned = sum(abandoned .* major_unprofitable)
 
-    borderline_profitable_mined = sum(mined .* borderline_profitable)
-    borderline_profitable_abandoned = sum(abandoned .* borderline_profitable)
+    minor_unprofitable_mined = sum(mined .* minor_unprofitable)
+    minor_unprofitable_abandoned = sum(abandoned .* minor_unprofitable)
 
-    profitable_mined = sum(mined .* profitable)
-    profitable_abandoned = sum(abandoned .* profitable)
+    minor_profitable_mined = sum(mined .* minor_profitable)
+    minor_profitable_abandoned = sum(abandoned .* minor_profitable)
 
-    mined_profit = sum(mined .* (ORES .- extraction_cost))
-    available_profit = sum(profitable .* (ORES .- extraction_cost))
+    major_profitable_mined = sum(mined .* major_profitable)
+    major_profitable_abandoned = sum(abandoned .* major_profitable)
 
-    mean_flys = mean(N_FLY)
+    major_profitable_mined_profit = sum(mined .* major_profitable .* (ORES .- extraction_cost))
+    minor_profitable_mined_profit = sum(mined .* minor_profitable .* (ORES .- extraction_cost))
+
+    major_profitable_available_profit = sum(major_profitable .* (ORES .- extraction_cost))
+    minor_profitable_available_profit = sum(minor_profitable .* (ORES .- extraction_cost))
+
     mined_flys = sum(N_FLY .* mined) / sum(mined)
     abandoned_flys = sum(N_FLY .* abandoned) / sum(abandoned)
 
-    println("N unprofitable: $n_unprofitable, N borderline profitable: $n_borderline_profitable, N profitable: $n_profitable")
-    println("Available Profit: $available_profit, Mined Profit: $mined_profit")
-    
-    println("Unprofitable: $n_unprofitable, Mined: $unprofitable_mined, Abandoned: $unprofitable_abandoned")
-    println("Borderline Profitable: $n_borderline_profitable, Mined: $borderline_profitable_mined, Abandoned: $borderline_profitable_abandoned")
-    println("Profitable: $n_profitable, Mined: $profitable_mined, Abandoned: $profitable_abandoned")
-    
-    println("Mean Bores: $mean_flys, Mined Flys: $mined_flys, Abandon Flys: $abandoned_flys")
-end 
+    println("Count based")
+    println("N Major Unprofitable: $n_major_unprofitable, N Minor Unprofitable: $n_minor_unprofitable, N Minor Profitable: $n_minor_profitable, N Major Profitable: $n_major_profitable")
+    println("Major Unprofitable: $n_major_unprofitable, Mined: $major_unprofitable_mined, Abandoned: $major_unprofitable_abandoned")
+    println("Minor Unprofitable: $n_minor_unprofitable, Mined: $minor_unprofitable_mined, Abandoned: $minor_unprofitable_abandoned")
+    println("Minor Profitable: $n_minor_profitable, Mined: $minor_profitable_mined, Abandoned: $minor_profitable_abandoned")
+    println("Major Profitable: $n_major_profitable, Mined: $major_profitable_mined, Abandoned: $major_profitable_abandoned")
+    println("")
+    println("Profit based")
+    println("Major Profitable - available Profit: $major_profitable_available_profit, Mined Profit: $major_profitable_mined_profit")
+    println("Minor Profitable - available Profit: $minor_profitable_available_profit, Mined Profit: $minor_profitable_mined_profit")    
+end
 
 function spot_check()
     DIS_RETURN, ORES, N_FLY, FINAL_ACTION, MEAN, STD_DEV, EX_COST = get_all_results(baseline=true)
@@ -264,4 +299,51 @@ function summarize_experiment_count()
     intelligent_seeds = get_uncompleted_seeds(baseline=false)
     println("Baseline: $(length(baseline_seeds))")
     println("Intelligent: $(length(intelligent_seeds))")
+end
+
+function compare_results()
+    dir1 = "/Users/benbarlow/dev/MineralExploration/data/experiments/baselinegrid/"
+    dir2 = "/Users/benbarlow/dev/MineralExploration/data/experiments/baselinenogrid/"
+
+    DIS_RETUR_1, ORE_1, N_FLY_1, FINAL_ACTIO_1, MEA_1, STD_DE_1, EX_COS_1 = get_all_results(baseline=true, dir=dir1)
+    DIS_RETUR_2, ORE_2, N_FLY_2, FINAL_ACTIO_2, MEA_2, STD_DE_2, EX_COS_2 = get_all_results(baseline=true, dir=dir2)
+
+    common_keys = intersect(Set(keys(DIS_RETUR_1)), Set(keys(DIS_RETUR_2)))
+    # print last component of directory
+    println("Directory 1: $(split(dir1, "/")[end-1]) Directory 2: $(split(dir2, "/")[end-1])")
+    for key in common_keys
+        # output ore1, ore 2, mean 1, mean 2, std 1, std 2
+        println("Seed: $key Ore1: $(ORE_1[key]) Ore2: $(ORE_2[key]) Mean1: $(MEA_1[key]) Mean2: $(MEA_2[key]) Std1: $(STD_DE_1[key]) Std2: $(STD_DE_2[key])")
+    end
+end
+
+
+function plot_std(;baseline::Bool, dir=nothing)
+    if dir == nothing
+        dir = get_results_dir(baseline=baseline)
+    end
+    files = glob("*_std_history.txt", dir)
+
+    # Initialize a list to store all the standard deviation values by line
+    all_std_values = []
+
+    # Loop through each file to read the data
+    for file in files
+        # Read the lines and parse them as Float64
+        std_values = readlines(file) |> x -> parse.(Float64, x)
+        
+        # Append the values to the respective line index in the all_std_values array
+        for i in 1:length(std_values)
+            if length(all_std_values) < i
+                push!(all_std_values, [])
+            end
+            push!(all_std_values[i], std_values[i])
+        end
+    end
+
+    # Compute the average standard deviation for each line
+    average_std_by_line = [mean(vals) for vals in all_std_values]
+
+    # Plot the results
+    plot(1:length(average_std_by_line), average_std_by_line, xlabel="Line Number", ylabel="Average Std Dev", title="Average Std Dev by Line Number", legend=false)
 end

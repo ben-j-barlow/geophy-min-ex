@@ -160,30 +160,31 @@ abstract type MainbodyGen end
     rng::AbstractRNG = Random.GLOBAL_RNG
     c_exp::Float64 = 100.0
 
-    base_grid_element_length::Float64 = 25.0 # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
+    base_grid_element_length::Float64 = 50.0 # length of each grid element in meters, 50x50 grid with grid_element_length = 100 models a 5km x 5km region 
     upscale_factor::Int = 4  # factor to upscale the grid by for smooth, higher resolution map
     smooth_grid_element_length::Float64 = base_grid_element_length / upscale_factor
     sigma::Float64 = 3  # for smoothing map with gaussian filter
-    geophysical_noise_std_dev::Float64 = 0.01
+    geophysical_noise_std_dev::Float64 = 0.00
     max_timesteps::Int = 120
     mineral_exploration_mode = "geophysical" # borehole or geophysical
     fly_cost::Float64 = 0.01
-    out_of_bounds_cost::Float64 = 0.0  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
-    out_of_bounds_tolerance::Int = 4 # number of grid base map grid squares the agent can be out of bounds before incurring cost
+    out_of_bounds_cost::Float64 = 5.0  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
+    out_of_bounds_tolerance::Int = -1 # number of grid base map grid squares the agent can be out of bounds before incurring cost
     massive_threshold::Float64 = 0.7
     strike_reward::Float64 = 1.0
     init_bank_angle::Int = 0
-    init_pos_x::Float64 = 150.0
+    init_pos_x::Float64 = 600.0
     init_pos_y::Float64 = 0.0
     init_heading::Float64 = HEAD_NORTH
     max_bank_angle::Int = 55
+    min_readings::Int = 30
     bank_angle_intervals::Int = 18
     timestep_in_seconds::Int = 1
     observations_per_timestep::Int = 1
     velocity::Int = 50
     extraction_cost::Float64 = 150.0
-    extraction_lcb::Float64 = 0.5
-    extraction_ucb::Float64 = 0.5
+    extraction_lcb::Float64 = 0.8
+    extraction_ucb::Float64 = 0.8
     target_mass_params::Tuple{Real, Real} = (extraction_cost, extraction_cost/3) # target mean and std when standardizing ore mass distributions
 end
 
@@ -210,15 +211,16 @@ end
 function get_geophysical_solver(c_exp::Float64, get_tree::Bool=false)
     return POMCPOWSolver(
         tree_queries=10000,
-        k_observation=2.0,
-        alpha_observation=0.3,
-        max_depth=5,
+        k_observation=1.5,
+        alpha_observation=0.15,
+        max_depth=6,
         check_repeat_obs=false,
         check_repeat_act=true,
         enable_action_pw=false,
         criterion=POMCPOW.MaxUCB(c_exp),
         final_criterion=POMCPOW.MaxQ(),
         estimate_value=geophysical_leaf_estimation,
+        #estimate_value=0.0,
         tree_in_info=get_tree,
     )
 end

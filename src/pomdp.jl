@@ -270,7 +270,6 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         #@info "new bank angle is $(new_bank_angle)"
         current_geophysical_obs, pos_x, pos_y, heading_p = generate_geophysical_obs_sequence(m, s, a, new_bank_angle)
     
-        
         # prepare for MEState
         geo_obs_p = append_geophysical_obs_sequence(deepcopy(s.geophysical_obs), current_geophysical_obs)
         pos_x_p = push!(deepcopy(s.agent_pos_x), deepcopy(pos_x))
@@ -296,8 +295,8 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         x_smooth_map = a.coords[2]  # correspond to smooth coordinates
         y_smooth_map = a.coords[1]
         x_base_map, y_base_map = convert_smooth_map_to_base_map_coordinates(x_smooth_map, y_smooth_map, m.upscale_factor)
-        #reading = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
-        reading = geophysical_obs(x_base_map, y_base_map, s.ore_map, 0.0)
+        reading = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
+        #reading = geophysical_obs(x_base_map, y_base_map, s.ore_map, 0.0)
         
         # prepare GeophysicalObservations object
         current_geophysical_obs = GeophysicalObservations()
@@ -319,34 +318,46 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
 
-    r = reward(m, s, a)
     sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, pos_x_p, pos_y_p, bank_angle_p, geo_obs_p)
+    r = reward(m, s, a)
     return (sp=sp, o=obs, r=r)
 end
 
-function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)
-    if a.type == :fly
-        if is_empty(o.geophysical_obs) # no observation at this timestep
-            r = -m.out_of_bounds_cost
-        else  # observation received
-            tol = 0
-            plane_in_region = check_plane_within_region(m, last(s.agent_pos_x), last(s.agent_pos_y), tol)
-            plane_in_region_p = check_plane_within_region(m, last(sp.agent_pos_x), last(sp.agent_pos_y), tol)
-            if plane_in_region && plane_in_region_p  # observations made consecutively
-                gradient = abs(sp.geophysical_obs.reading[end] - s.geophysical_obs[end])
-                r = - 1 / (gradient * 100)
-            else
-                r = 0
-            end
-        end
-    else
-        if a.type == :mine
-            r = extraction_reward(m, s)
-        end
-    end
-        return r
-end
+# function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)
+#     if a.type == :fly
+#         if is_empty(o.geophysical_obs) # no observation at this timestep
+#             r = -m.out_of_bounds_cost
+#         else  # observation received
+#             tol = 0
+#             plane_in_region = check_plane_within_region(m, last(s.agent_pos_x), last(s.agent_pos_y), tol)
+#             plane_in_region_p = check_plane_within_region(m, last(sp.agent_pos_x), last(sp.agent_pos_y), tol)
+#             if plane_in_region && plane_in_region_p  # observations made consecutively
+#                 gradient = abs(sp.geophysical_obs.reading[end] - s.geophysical_obs[end])
+#                 r = - 1 / (gradient * 100)
+#             else
+#                 r = 0
+#             end
+#         end
+#     else
+#         if a.type == :mine
+#             r = extraction_reward(m, s)
+#         end
+#     end
+#         return r
+# end
+function distance_from_map(x::Float64, y::Float64, max_coordinate::Int, m::MineralExplorationPOMDP)
+    # Clamp x and y to the bounds of the map [1, max_coordinate]
+    x_clamped = clamp(ceil(Int, x), 0, max_coordinate * m.base_grid_element_length)
+    y_clamped = clamp(ceil(Int, y), 0, max_coordinate * m.base_grid_element_length)
     
+    # Calculate the difference between the continuous position and the clamped position
+    x_diff = x - x_clamped
+    y_diff = y - y_clamped
+    
+    # Return the differences as a tuple
+    total_distance = sqrt(x_diff^2 + y_diff^2)
+    return total_distance
+end
 
 function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
     #@info "POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)"
@@ -365,18 +376,24 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
             error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
         end
     elseif m.mineral_exploration_mode == "geophysical"
+        in_region = check_plane_within_region(m, last(s.agent_pos_x), last(s.agent_pos_y), m.out_of_bounds_tolerance)
         if a_type == :fly
-            if check_plane_within_region(m, last(s.agent_pos_x), last(s.agent_pos_y), m.out_of_bounds_tolerance)
+            if in_region
                 r = -m.fly_cost
                 #@info "negative flying cost $(r)"
             else
-                r = - (m.fly_cost + m.out_of_bounds_cost)
+                r = -(m.fly_cost + m.out_of_bounds_cost * distance_from_map(last(s.agent_pos_x), last(s.agent_pos_y), m.grid_dim[1], m))
                 #@info "negative flying cost with out of bounds cost $(r)"
             end
         elseif a_type == :fake_fly
             r = -m.fly_cost
         elseif a_type == :mine
-            r = extraction_reward(m, s)
+            if in_region
+                r = extraction_reward(m, s)
+            else
+                r = -m.out_of_bounds_cost * distance_from_map(last(s.agent_pos_x), last(s.agent_pos_y), m.grid_dim[1], m)
+            end
+            #r = extraction_reward(m, s)
             #@info "mining so positive extraction reward $(r)"
         elseif a_type in [:stop, :abandon]
             r = 0.0
@@ -388,13 +405,13 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
     return r
 end
 
-function reward_a(s::MEState)
-    if is_empty(s.geophysical_obs)
-        return 0
-    else
-        return last(s.geophysical_obs.reading)
-    end
-end
+# function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction, sp::MEState, o::MEObservation)
+#     if o.geophysical_obs == nothing || is_empty(o.geophysical_obs) 
+#         return -1
+#     else
+#         return last(o.geophysical_obs.reading)
+#     end
+# end
 
 function POMDPs.actions(m::MineralExplorationPOMDP)
     #@info "POMDPs.actions(m::MineralExplorationPOMDP)"
@@ -626,7 +643,8 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
             # generate observation
             #@info "smooth map coordinates $(x_smooth_map), $(y_smooth_map)"
             obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
-            #obs = geophysical_obs(x_base_map, y_base_map, s.ore_map, m.geophysical_noise_std_dev)
+            #obs = geophysical_obs(x_base_map, y_base_map, s.ore_map, 0.0)
+            
             push!(tmp_go.reading, deepcopy(obs))
             tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[y_smooth_map x_smooth_map], 2, 1))
             tmp_go.base_map_coordinates = hcat(tmp_go.base_map_coordinates, reshape(Int64[y_base_map x_base_map], 2, 1))

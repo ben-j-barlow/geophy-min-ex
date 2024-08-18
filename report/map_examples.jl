@@ -51,19 +51,3 @@ for (seed, name) in zip(SEEDS, NAMES)
     save_maps_for_report(ds0, m, seed_save_dir, seed)
 end
 
-
-Random.seed!(SEEDS[1])
-s0 = rand(ds0, save_dir=save_dir);
-
-mainbody_param = s0.mainbody_params
-mainbody_gen = m.mainbody_gen
-NOISE = 2
-p = plot_map(s0.mainbody_map, "mainbody map", axis=false)
-savefig(p, string(save_dir, "$(0)perturb.pdf"))
-empty!(p)
-for i in 1:3
-    mainbody_map, mainbody_param = MineralExploration.perturb_sample(mainbody_gen, mainbody_param, NOISE) # Perturb the main body map and parameters
-    p = plot_map(mainbody_map, axis=false)
-    savefig(p, string(save_dir, "$(i)perturb.pdf"))
-    empty!(p) 
-end

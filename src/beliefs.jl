@@ -217,8 +217,16 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
         rock_obs_p = RockObservations(rock_obs.ore_quals, rock_obs.coordinates) # Create a new RockObservations object with the updated coordinates and ore qualities
 
         smooth_map = smooth_map_with_filter(ore_map, up.sigma, up.upscale_factor)
+
+        agent_pos_x_p = deepcopy(s.agent_pos_x)
+        agent_pos_y_p = deepcopy(s.agent_pos_y)
+        bank_angle_p = deepcopy(s.agent_bank_angle)
+        push!(agent_pos_x_p, o.agent_pos_x)
+        push!(agent_pos_y_p, o.agent_pos_y)
+        push!(bank_angle_p, o.agent_bank_angle)
+
         sp = MEState(ore_map, smooth_map, mainbody_param, mainbody_map, rock_obs_p, # Create a new state with the updated ore map, parameters, and observations
-            o.stopped, o.decided, s.agent_heading, s.agent_pos_x, s.agent_pos_y, s.agent_bank_angle, s.geophysical_obs)
+            o.stopped, o.decided, o.agent_heading, agent_pos_x_p, agent_pos_y_p, bank_angle_p, s.geophysical_obs)
         push!(mainbody_params, mainbody_param) # Add the main body parameters to the array
         push!(particles, sp) # Add the new state to the particles array
     end
@@ -236,8 +244,9 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
     particles = MEState[]
 
     dummy_geo_obs = GeophysicalObservations() # used to force multiple dispatch to the correct method
-
+    i = 0
     for s in sampled_particles
+        i += 1
         # perform perturbation
         mainbody_param = s.mainbody_params
         mainbody_map = s.mainbody_map
@@ -254,7 +263,7 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
 
         # take average in case of multiple readings at the same location
         geo_obs_dedupe = aggregate_base_map_duplicates(geo_obs)
-
+        
         # initialize ahead of normalization
         n_normalized_reading = Float64[]
         readings = deepcopy(geo_obs_dedupe.reading)
@@ -265,6 +274,7 @@ function resample(up::MEBeliefUpdater, particles::Vector, wp::Vector{Float64},
             to_append = (value - prior_ore)
             push!(n_normalized_reading, to_append)
         end
+        
         geostats.geophysical_data.reading = n_normalized_reading  # update geostats to contain the normalized readings
         geostats.geophysical_data.base_map_coordinates = geo_obs_dedupe.base_map_coordinates  # update geostats to contain the deduped coordinates
 
@@ -296,10 +306,11 @@ end
 
 
 function update_particles(up::MEBeliefUpdater, particles::Vector{MEState},
-    geostats::GeoDist, obs::Union{GeophysicalObservations,RockObservations}, a::MEAction, o::MEObservation)
+    geostats::GeoDist, obs::Union{GeophysicalObservations,RockObservations}, a::MEAction, o::MEObservation, num_actions::Int64=1)
     #@info "update_particles"
     wp = reweight(up, geostats, particles, obs)
-    pp = resample(up, particles, wp, geostats, obs, a, o)
+    apply_perturbation = num_actions % 1 == 0
+    pp = resample(up, particles, wp, geostats, obs, a, o, apply_perturbation=apply_perturbation, resample_background_noise=true)
     return pp
 end
 
@@ -355,6 +366,11 @@ function inject_particles(up::MEBeliefUpdater, n::Int64)
     return rand(up.rng, d, n)
 end
 
+function geo_obs_to_rock_obs(obs::GeophysicalObservations)
+    dedupe_geophysical_obs = aggregate_base_map_duplicates(deepcopy(obs))
+    return RockObservations(ore_quals=dedupe_geophysical_obs.reading, coordinates=dedupe_geophysical_obs.base_map_coordinates)
+end
+
 function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
     a::MEAction, o::MEObservation)
     #@info "POMDPs.update(up::MEBeliefUpdater, b::MEBelief, a::MEAction, o::MEObservation)"
@@ -392,6 +408,8 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
                     b.geostats.domain, b.geostats.mean,
                     b.geostats.variogram, b.geostats.lu_params)
                 update!(bp_geostats, bp_rock)
+                @info "after update! bp_geostats $(bp_geostats.data.ore_quals)"
+
             elseif up.m.geodist_type == GSLIBDistribution
                 bp_geostats = GSLIBDistribution(b.geostats.grid_dims, b.geostats.grid_dims,
                     bp_rock, b.geostats.mean, b.geostats.sill, b.geostats.nugget,
@@ -405,35 +423,43 @@ function POMDPs.update(up::MEBeliefUpdater, b::MEBelief,
             bp_particles = f_update_particles(up, b.particles, bp_geostats, bp_rock, a, o)
         end
     elseif up.m.mineral_exploration_mode == "geophysical"
-        bp_rock = deepcopy(b.rock_obs) # create dummy variable ahead of instantiation of MEBelief
-
-        if (a.type == :fly && !is_empty(o.geophysical_obs)) || a.type == :fake_fly
-            bp_geophysical_obs = append_geophysical_obs_sequence(b.geophysical_obs, o.geophysical_obs)            
-            bp_dedupe_geophysical_obs = aggregate_base_map_duplicates(bp_geophysical_obs)
-
-            if up.m.geodist_type == GeoStatsDistribution
-                bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock), bp_dedupe_geophysical_obs,
-                    b.geostats.domain, b.geostats.mean,
-                    b.geostats.variogram, b.geostats.lu_params)
-                update!(bp_geostats, bp_dedupe_geophysical_obs)
-            else
-                error("GSLIBDistribution not implemented for fly action")
-            end
-            bp_particles = update_particles(up, b.particles, bp_geostats, bp_geophysical_obs, a, o)
+        cond = true
+        if cond && ((a.type == :fly && !is_empty(o.geophysical_obs)) || a.type == :fake_fly)
+            # dedupe geo obs
+            bp_geophysical_obs = append_geophysical_obs_sequence(deepcopy(b.geophysical_obs), deepcopy(o.geophysical_obs))
             
+            # convert geo obs to rock obs
+            bp_rock = geo_obs_to_rock_obs(bp_geophysical_obs)
+
+            # same as mern
+            bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, deepcopy(bp_rock), GeophysicalObservations(),
+                b.geostats.domain, b.geostats.mean,
+                b.geostats.variogram, b.geostats.lu_params)
+            update!(bp_geostats, bp_rock)
+            bp_particles = update_particles(up, b.particles, bp_geostats, bp_rock, a, o, length(b.acts))
+
         else # mine, abandon, stop, or (fly & is_empty(o.geophysical_obs))
             bp_particles = MEState[] # MEState[p for p in b.particles]
             for p in b.particles
                 # behaviour built into o::MEObservation: plane dynamics are same as in the previous timestep for a in {mine, abandon, or stop}
                 # behaviour built into o::MEObservation: plane dynamics update if (a = fly) & (is_empty(o.geophysical_obs))
-                agent_pos_x_p = push!(deepcopy(p.agent_pos_x), deepcopy(o.agent_pos_x))
-                agent_pos_y_p = push!(deepcopy(p.agent_pos_y), deepcopy(o.agent_pos_y))
-                bank_angle_p = push!(deepcopy(p.agent_bank_angle), deepcopy(o.agent_bank_angle))
+                agent_pos_x_p = deepcopy(p.agent_pos_x)
+                agent_pos_y_p = deepcopy(p.agent_pos_y)
+                bank_angle_p = deepcopy(p.agent_bank_angle)
+
+                push!(bank_angle_p, o.agent_bank_angle)
+                push!(agent_pos_x_p, o.agent_pos_x)
+                push!(agent_pos_y_p, o.agent_pos_y)
+
                 s = MEState(p.ore_map, p.smooth_map, p.mainbody_params, p.mainbody_map, p.rock_obs, o.stopped, o.decided, o.agent_heading, agent_pos_x_p, agent_pos_y_p, bank_angle_p, p.geophysical_obs) # Update the state with new observations
                 push!(bp_particles, s)
-            end    
+            end
+
+            bp_rock = geo_obs_to_rock_obs(deepcopy(b.geophysical_obs)) # no need to append o.geophysical_obs as it is empty
+            bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, bp_rock, GeophysicalObservations(),
+                b.geostats.domain, b.geostats.mean,
+                b.geostats.variogram, b.geostats.lu_params)
             bp_geophysical_obs = deepcopy(b.geophysical_obs)
-            bp_geostats = GeoStatsDistribution(b.geostats.grid_dims, bp_rock, bp_geophysical_obs, b.geostats.domain, b.geostats.mean, b.geostats.variogram, b.geostats.lu_params)
         end
     end
 
@@ -539,7 +565,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::MEBelief)
 
         # if not stopped but stop bound satisfied, return stop
         #tmp = false
-        if calculate_stop_bound(m, b)
+        if calculate_stop_bound(m, b) && length(b.geophysical_obs.reading) > m.min_readings
             return MEAction[MEAction(type=:stop)]
         end
         
@@ -646,7 +672,7 @@ function POMDPs.actions(m::MineralExplorationPOMDP, b::POMCPOW.StateBelief)
         else
             # add stop and flying actions to the belief tree
             to_return = get_flying_actions(m, last(s.agent_bank_angle))
-            push!(to_return, MEAction(type=:stop))
+            #push!(to_return, MEAction(type=:stop))
             return to_return
         end
     end
@@ -722,20 +748,20 @@ function Plots.plot(b::MEBelief, t=nothing; axis=false, cmap=:viridis, return_in
     yl = (1, size(mean, 2))
     fig1 = heatmap(mean[:, :, 1], title=mean_title, fill=true, clims=(0.0, 1.0), legend=:none, ratio=1, c=cmap, xlims=xl, ylims=yl, axis=axis)
     fig2 = heatmap(sqrt.(var[:, :, 1]), title=std_title, fill=true, legend=:none, clims=(0.0, 0.2), ratio=1, c=cmap, xlims=xl, ylims=yl, axis=axis)
-    if !isempty(b.rock_obs.ore_quals)
-        x = b.rock_obs.coordinates[2, :]
-        y = b.rock_obs.coordinates[1, :]
-        plot!(fig1, x, y, seriestype=:scatter)
-        plot!(fig2, x, y, seriestype=:scatter)
-        n = length(b.rock_obs)
-        if n > 1
-            for i = 1:n-1
-                x = b.rock_obs.coordinates[2, i:i+1]
-                y = b.rock_obs.coordinates[1, i:i+1]
-                plot!(fig1, x, y, arrow=:closed, color=:black)
-            end
-        end
-    end
+    # if !isempty(b.rock_obs.ore_quals)
+    #     x = b.rock_obs.coordinates[2, :]
+    #     y = b.rock_obs.coordinates[1, :]
+    #     plot!(fig1, x, y, seriestype=:scatter)
+    #     plot!(fig2, x, y, seriestype=:scatter)
+    #     n = length(b.rock_obs)
+    #     if n > 1
+    #         for i = 1:n-1
+    #             x = b.rock_obs.coordinates[2, i:i+1]
+    #             y = b.rock_obs.coordinates[1, i:i+1]
+    #             plot!(fig1, x, y, arrow=:closed, color=:black)
+    #         end
+    #     end
+    # end
     if !is_empty(b.geophysical_obs)
         x = b.geophysical_obs.base_map_coordinates[2, :]
         y = b.geophysical_obs.base_map_coordinates[1, :]

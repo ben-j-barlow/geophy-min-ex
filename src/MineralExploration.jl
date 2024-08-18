@@ -84,7 +84,8 @@ export
         update_agent_state,
         generate_geophysical_obs_sequence,
         is_empty,
-        check_plane_within_region
+        check_plane_within_region,
+        distance_from_map
 include("pomdp.jl")
 
 export
@@ -150,7 +151,10 @@ export
         write_baseline_result_to_file,
         write_intelligent_result_to_file,
         get_uncompleted_seeds,
-        get_all_seeds
+        get_all_seeds,
+        output_results,
+        compare_results,
+        plot_std
 include("experiment_utils.jl")
 
 end
