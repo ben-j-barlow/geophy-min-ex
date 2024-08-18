@@ -356,6 +356,7 @@ function distance_from_map(x::Float64, y::Float64, max_coordinate::Int, m::Miner
     
     # Return the differences as a tuple
     total_distance = sqrt(x_diff^2 + y_diff^2)
+    pentalty = total_distance / (m.base_grid_element_length * m.out_of_bounds_cost)
     return total_distance
 end
 
@@ -391,7 +392,7 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
             if in_region
                 r = extraction_reward(m, s)
             else
-                r = -m.out_of_bounds_cost * distance_from_map(last(s.agent_pos_x), last(s.agent_pos_y), m.grid_dim[1], m)
+                r = 0
             end
             #r = extraction_reward(m, s)
             #@info "mining so positive extraction reward $(r)"

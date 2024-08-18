@@ -234,7 +234,7 @@ function geophysical_leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState,
                 return γ*r_extract*0.1
             end
         else
-            return -pomdp.out_of_bounds_cost * distance_from_map(last(s.agent_pos_x), last(s.agent_pos_y), pomdp.grid_dim[1], pomdp)
+            return -pomdp.out_of_bounds_cost
         end
     end
 end
