@@ -15,7 +15,7 @@ N_PARTICLES = 1000
 MOVE_MULT = 6  # assuming 50ms plane, 25m grid cell lengths
 SIDESTEP_MULT = 8 # line spacing of 200m and 50m grid cells
 INIT_X_BASE = 8 # go 8, 16, ..., 40
-EARLY_STOP = false
+EARLY_STOP = true
 SEEDS = get_uncompleted_seeds(baseline=true)
 GRID_LINES = true
 
@@ -24,15 +24,10 @@ GRID_LINES = true
 m = MineralExplorationPOMDP(
     upscale_factor=4,
     sigma=3,
-    geophysical_noise_std_dev=0.02
+    geophysical_noise_std_dev=0.02,
+    extraction_lcb = 0.7,
+    extraction_ucb = 0.7
     )
-
-# Initialize the state distribution for the POMDP model
-ds0 = POMDPs.initialstate(m)
-
-# Define the belief updater for the POMDP with 1000 particles and a spread factor of 2.0
-up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION)
-b0 = POMDPs.initialize_belief(up, ds0)
 
 # set up the solver
 max_coord = m.grid_dim[1] * m.upscale_factor
@@ -50,7 +45,14 @@ final_belief = nothing
 
 for (i, seed) in enumerate(SEEDS[1:150])
     Random.seed!(seed)
+    # Initialize the state distribution for the POMDP model
+    ds0 = POMDPs.initialstate(m)
+
+    # Define the belief updater for the POMDP with 1000 particles and a spread factor of 2.0
+    up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION)
+    b0 = POMDPs.initialize_belief(up, ds0)
     s0 = rand(ds0)  # Sample a starting state
+    
     s_massive = s0.ore_map .>= m.massive_threshold  # Identify massive ore locations
     @assert m.dim_scale == 1
     r_massive = sum(s_massive)  # Calculate total massive ore

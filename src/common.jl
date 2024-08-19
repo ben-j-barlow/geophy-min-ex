@@ -183,8 +183,8 @@ abstract type MainbodyGen end
     observations_per_timestep::Int = 1
     velocity::Int = 50
     extraction_cost::Float64 = 150.0
-    extraction_lcb::Float64 = 0.8
-    extraction_ucb::Float64 = 0.8
+    extraction_lcb::Float64 = 0.7
+    extraction_ucb::Float64 = 0.7
     target_mass_params::Tuple{Real, Real} = (extraction_cost, extraction_cost/3) # target mean and std when standardizing ore mass distributions
 end
 
