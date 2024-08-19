@@ -11,15 +11,16 @@ using Random
 using D3Trees
 
 # Constants for the problem setup
-NOISE_FOR_PERTURBATION = 0.7
+NOISE_FOR_PERTURBATION = 1.0
 N_PARTICLES = 1000
 C_EXP = 125.0
+GET_TREES = false
 SEEDS = get_uncompleted_seeds(baseline=false)
 
 # Create a POMDP model for mineral exploration with specified parameters
 m = MineralExplorationPOMDP(
     # DO NOT CHANGE - same as baseline
-    upscale_factor=4,
+    upscale_factor=1,
     sigma=3,
     geophysical_noise_std_dev=0.02,
     ### 
@@ -27,26 +28,40 @@ m = MineralExplorationPOMDP(
     c_exp=C_EXP,
     init_pos_x=7.5*25.0, # align with baseline starting in x=8
     init_pos_y=0.0,
-    init_heading=HEAD_NORTH,
+    init_heading=(HEAD_NORTH + HEAD_EAST) / 2,
     max_bank_angle=55,
     max_timesteps=150,
     massive_threshold=0.7,
-    out_of_bounds_cost=0.1,
-    out_of_bounds_tolerance=4.0,
+    out_of_bounds_cost=0, # greater than -10 so 0.1*extraction_reward() is a smaller negative
+    out_of_bounds_tolerance=0.0,
     fly_cost=0.01,
-    velocity=60,
-    min_readings=30,
+    velocity=35,
+    min_readings=70,
     bank_angle_intervals=18,
     timestep_in_seconds=1,
     observations_per_timestep=1,
     extraction_cost=150.0,
-    extraction_lcb=0.8,
-    extraction_ucb=0.8
+    extraction_lcb=0.7,
+    extraction_ucb=0.7
 )
 
 
 # set up the solver
-solver = get_geophysical_solver(C_EXP, true)
+#solver = get_geophysical_solver(C_EXP, false)
+solver = POMCPOWSolver(
+    tree_queries=20000,
+    k_observation=2.0,
+    alpha_observation=0.3,
+    max_depth=5,
+    check_repeat_obs=false,
+    check_repeat_act=true,
+    enable_action_pw=false,
+    criterion=POMCPOW.MaxUCB(m.c_exp),
+    final_criterion=POMCPOW.MaxQ(),
+    estimate_value=geophysical_leaf_estimation,
+    #estimate_value=0.0,
+    tree_in_info=GET_TREES,
+)
 planner = POMDPs.solve(solver, m)
 
 println("Starting simulations")
@@ -56,7 +71,9 @@ final_state = nothing
 final_belief = nothing    
 trees = []
 
-for (i, seed) in enumerate(SEEDS[1:10])
+beliefs = []
+
+for (i, seed) in enumerate(SEEDS[20:30])
     Random.seed!(seed)
     println(seed)
 
@@ -76,27 +93,27 @@ for (i, seed) in enumerate(SEEDS[1:10])
     n_fly = 0  # Initialize the fly count
     mns = []
     stds = []
-    #a, ai = POMCPOW.action_info(planner, b0, tree_in_info=true)
-    #inbrowser(D3Tree(ai[:tree], init_expand=1), "safari")
+    in_region = true
+    
+    a, ai = POMCPOW.action_info(planner, b0, tree_in_info=true)
+    inbrowser(D3Tree(ai[:tree], init_expand=1), "safari")
 
-    for (sp, a, r, bp, t) in stepthrough(m, planner, up, b0, s0, "sp,a,r,bp,t", rng=m.rng)
-        push!(trees, deepcopy(planner.tree))
-        if !check_plane_within_region(m, last(sp.agent_pos_x), last(sp.agent_pos_y), 0)
-            inbrowser(D3Tree(trees[t-2], init_expand=1), "safari")
-            inbrowser(D3Tree(trees[t-1], init_expand=1), "safari")
-            break;
+    for (sp, a, r, bp, t) in stepthrough(m, planner, up, b0, s0, "sp,a,r,bp,t", rng=m.rng)        
+        if in_region && !check_plane_within_region(m, last(sp.agent_pos_x), last(sp.agent_pos_y), 0)
+            in_region = false
+            a, ai = POMCPOW.action_info(planner, beliefs[end], tree_in_info=true)
+            inbrowser(D3Tree(ai[:tree], init_expand=1), "safari")
         end
         
+    
         if a.type == :fly
             n_fly += 1
 
         end
         v += POMDPs.discount(m)^(t - 1) * r
 
-        if t % 10 == 2
+        if t % 10 == 0
             println("Mean Ore: t $t $(last(mns)) ± $(last(stds))")
-            p = plot_smooth_map_and_plane_trajectory(sp, m; t=t)
-            display(p)
         end
 
         b_vol = [calc_massive(m, p) for p in bp.particles]
@@ -105,6 +122,8 @@ for (i, seed) in enumerate(SEEDS[1:10])
 
         final_belief = bp
         final_state = sp
+
+        push!(beliefs, bp)
     end
     
     #println("Steps: $(length(h))")

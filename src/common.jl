@@ -105,6 +105,7 @@ struct MEState{MB}
     agent_pos_y::Vector{Float64}
     agent_bank_angle::Vector{Int64}  # bank angle of agent
     geophysical_obs::GeophysicalObservations
+    timestep::Int
 end
 
 function Base.length(obs::RockObservations)

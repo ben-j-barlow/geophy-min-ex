@@ -218,7 +218,7 @@ function geophysical_leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState,
             end
             n_readings = length(s.geophysical_obs.reading)
         end
-        t = pomdp.max_timesteps - n_readings + 1
+        t = pomdp.max_timesteps - s.timestep + 1
         γ = POMDPs.discount(pomdp)^t
     end
 
@@ -226,15 +226,15 @@ function geophysical_leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState,
     if s.decided
         return 0.0
     else
-        if check_plane_within_region(pomdp, last(s.agent_pos_x), last(s.agent_pos_y), pomdp.out_of_bounds_tolerance)  
-            r_extract = extraction_reward(pomdp, s)
-            if r_extract >= 0.0    
-                    return γ*r_extract*0.9
+        r_extract = extraction_reward(pomdp, s)
+        if r_extract >= 0.0
+            if check_plane_within_region(pomdp, last(s.agent_pos_x), last(s.agent_pos_y), 0)
+                return r_extract*0.9
             else
-                return γ*r_extract*0.1
+                return 0 # penalty for going out of region
             end
         else
-            return -pomdp.out_of_bounds_cost
+            return r_extract*0.1
         end
     end
 end
@@ -323,7 +323,7 @@ function POMDPs.action(p::BaselineGeophysicalPolicy, b::MEBelief)
         end
     end
 
-    if p.early_stop && calculate_stop_bound(p.m, b) && p.current_move > m.min_readings
+    if p.early_stop && calculate_stop_bound(p.m, b) && p.current_move > 15
         return MEAction(type=:stop)
     end
 

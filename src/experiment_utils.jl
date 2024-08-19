@@ -94,9 +94,9 @@ end
 
 function get_results_dir(;baseline::Bool)
     if baseline
-        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/baselinestopearly/"
+        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/baseline/"
     else
-        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/intelligent/"
+        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/intelligent_cf8/"
     end
     return dir
 end

@@ -161,7 +161,7 @@ function Base.rand(rng::Random.AbstractRNG, d::MEInitStateDist, n::Int=1; truth:
         end
         smooth_map = smooth_map_with_filter(ore_map, d.sigma, d.upscale_factor)
 
-        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_y)], [d.m.init_bank_angle], GeophysicalObservations())
+        state = MEState(ore_map, smooth_map, lode_params, lode_map, RockObservations(), false, false, convert(Float64, d.m.init_heading), [convert(Float64, d.m.init_pos_x)], [convert(Float64, d.m.init_pos_y)], [d.m.init_bank_angle], GeophysicalObservations(), 0)
         push!(states, state)
     end
     if n == 1
@@ -281,7 +281,7 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         if m.observations_per_timestep > 1
             error("assumes one observation per timestep when calculaing n_reading")
         end
-        stopped_p = n_reading >= m.max_timesteps 
+        stopped_p = s.timestep >= m.max_timesteps 
         decided_p = false
         obs = MEObservation(nothing, stopped_p, decided_p, current_geophysical_obs, heading_p, pos_x, pos_y, new_bank_angle)
 
@@ -318,8 +318,8 @@ function POMDPs.gen(m::MineralExplorationPOMDP, s::MEState, a::MEAction, rng::Ra
         error("Invalid Action! Action: $(a.type), Stopped: $stopped, Decided: $decided")
     end
 
-    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, pos_x_p, pos_y_p, bank_angle_p, geo_obs_p)
-    r = reward(m, s, a)
+    sp = MEState(s.ore_map, s.smooth_map, s.mainbody_params, s.mainbody_map, rock_obs_p, stopped_p, decided_p, heading_p, pos_x_p, pos_y_p, bank_angle_p, geo_obs_p, s.timestep+1)
+    r = reward(m, sp, a)
     return (sp=sp, o=obs, r=r)
 end
 
@@ -383,19 +383,14 @@ function POMDPs.reward(m::MineralExplorationPOMDP, s::MEState, a::MEAction)
                 r = -m.fly_cost
                 #@info "negative flying cost $(r)"
             else
-                r = -(m.fly_cost + m.out_of_bounds_cost * distance_from_map(last(s.agent_pos_x), last(s.agent_pos_y), m.grid_dim[1], m))
+                r = -m.fly_cost
+                #r = -(m.fly_cost + m.out_of_bounds_cost * distance_from_map(last(s.agent_pos_x), last(s.agent_pos_y), m.grid_dim[1], m))
                 #@info "negative flying cost with out of bounds cost $(r)"
             end
         elseif a_type == :fake_fly
             r = -m.fly_cost
         elseif a_type == :mine
-            if in_region
-                r = extraction_reward(m, s)
-            else
-                r = 0
-            end
-            #r = extraction_reward(m, s)
-            #@info "mining so positive extraction reward $(r)"
+            r = extraction_reward(m, s)  # cannot depend on being in region because otherwise belief > 150 leads to abandon being chosen
         elseif a_type in [:stop, :abandon]
             r = 0.0
             #@info "stop or abandon so zero reward $(r)"
@@ -643,8 +638,8 @@ function generate_geophysical_obs_sequence(m::MineralExplorationPOMDP, s::MEStat
         
             # generate observation
             #@info "smooth map coordinates $(x_smooth_map), $(y_smooth_map)"
-            obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
-            #obs = geophysical_obs(x_base_map, y_base_map, s.ore_map, 0.0)
+            #obs = geophysical_obs(x_smooth_map, y_smooth_map, s.smooth_map, m.geophysical_noise_std_dev)
+            obs = geophysical_obs(x_base_map, y_base_map, s.ore_map, 0.0)
             
             push!(tmp_go.reading, deepcopy(obs))
             tmp_go.smooth_map_coordinates = hcat(tmp_go.smooth_map_coordinates, reshape(Int64[y_smooth_map x_smooth_map], 2, 1))
