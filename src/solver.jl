@@ -323,7 +323,7 @@ function POMDPs.action(p::BaselineGeophysicalPolicy, b::MEBelief)
         end
     end
 
-    if p.early_stop && calculate_stop_bound(p.m, b)
+    if p.early_stop && calculate_stop_bound(p.m, b) && p.current_move > m.min_readings
         return MEAction(type=:stop)
     end
 
