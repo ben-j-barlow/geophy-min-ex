@@ -15,7 +15,7 @@ N_PARTICLES = 1000
 MOVE_MULT = 6  # assuming 50ms plane, 25m grid cell lengths
 SIDESTEP_MULT = 8 # line spacing of 200m and 50m grid cells
 INIT_X_BASE = 8 # go 8, 16, ..., 40
-EARLY_STOP = true
+EARLY_STOP = false
 SEEDS = get_uncompleted_seeds(baseline=true)
 GRID_LINES = true
 
@@ -53,7 +53,7 @@ for (i, seed) in enumerate(SEEDS[1:150])
     b0 = POMDPs.initialize_belief(up, ds0)
     s0 = rand(ds0)  # Sample a starting state
     
-    s_massive = s0.ore_map .>= m.massive_threshold  # Identify massive ore locations
+    s_massive = s0.mainbody_map .>= m.massive_threshold  # Identify massive ore locations
     @assert m.dim_scale == 1
     r_massive = sum(s_massive)  # Calculate total massive ore
     println("Massive Ore: $r_massive")
@@ -95,7 +95,7 @@ for (i, seed) in enumerate(SEEDS[1:150])
     println("======================")
     
     b_hist, vols, mn, std = plot_volume(m, final_belief, r_massive; verbose=false)
-    write_baseline_result_to_file(m, final_belief, final_state, mns, stds; n_fly=n_fly, reward=v, seed=seed, r_massive=r_massive, grid=GRID_LINES, which_map=:base)
+    write_baseline_result_to_file(m, final_belief, final_state, mns, stds; n_fly=n_fly, reward=v, seed=seed, r_massive=r_massive, grid=GRID_LINES, which_map=:smooth)
     
     GC.gc()
 end

@@ -80,7 +80,7 @@ for (i, seed) in enumerate(SEEDS[1:61])
     up = MEBeliefUpdater(m, N_PARTICLES, NOISE_FOR_PERTURBATION)
     b0 = POMDPs.initialize_belief(up, ds0)
 
-    s_massive = s0.ore_map .>= m.massive_threshold  # Identify massive ore locations
+    s_massive = s0.mainbody_map .>= m.massive_threshold  # Identify massive ore locations
     @assert m.dim_scale == 1
     r_massive = sum(s_massive)  # Calculate total massive ore
     println("Massive Ore: $r_massive")
