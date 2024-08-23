@@ -10,8 +10,9 @@ using MineralExploration
 using Random
 using D3Trees
 
-save_dir = "/Users/benbarlow/dev/diss-plots/help_plots/illustrative/intelligent/"
-SEED = 30169
+
+SEED = 4804
+save_dir = "/Users/benbarlow/dev/diss-plots/help_plots/illustrative/intelligent/$(SEED)_"
 DPI = 300
 NOISE_FOR_PERTURBATION = 0.8
 N_PARTICLES = 1000
@@ -142,7 +143,7 @@ for (sp, a, r, bp, t) in stepthrough(m, planner, up, b0, s0, "sp,a,r,bp,t", rng=
     push!(mns, mn)
     push!(stds, std)
 
-    if t % 5 == 0 || final_belief.decided
+    if t % 10 == 0 || final_belief.decided
         b_mn, b_std = plot(bp, return_individual=true)
         map_and_plane = plot_smooth_map_and_plane_trajectory(sp, m, t=t)
 
