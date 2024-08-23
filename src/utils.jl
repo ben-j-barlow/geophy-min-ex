@@ -458,17 +458,17 @@ function plot_volume(m::MineralExplorationPOMDP, b0::MEBelief, r_massive::Real; 
     h = fit(Histogram, vols, [0:10:400;])
     h = normalize(h, mode=:probability)
 
-    b0_hist = plot(h, title="belief volumes t=$t, μ=$mean_vols, σ=$std_vols", legend=:none, c=:cadetblue)
+    b0_hist = plot(h, title="Belief volume t=$t \n μ=$mean_vols, σ=$std_vols", legend=:none, c=:cadetblue)
     h_height = maximum(h.weights)
 
     # plot true volume in solid red
     plot!(b0_hist, [r_massive, r_massive], [0.0, h_height], linecolor=:crimson, linewidth=3)
 
     # plot mean volume in dashed red
-    plot!([mean_vols, mean_vols], [0.0, h_height], linecolor=:crimson, linestyle=:dash, linewidth=2, label=false)
+    #plot!([mean_vols, mean_vols], [0.0, h_height], linecolor=:crimson, linestyle=:dash, linewidth=2, label=false)
 
     # plot extraction cost in gold
-    plot!([m.extraction_cost, m.extraction_cost], [0.0, h_height / 3], linecolor=:gold, linewidth=4, label=false)
+    #plot!([m.extraction_cost, m.extraction_cost], [0.0, h_height / 3], linecolor=:gold, linewidth=4, label=false)
     ylims!(0, h_height * 1.05)
 
     return (b0_hist, vols, mean_vols, std_vols)
@@ -611,8 +611,8 @@ function plot_smooth_map_and_plane_trajectory(s::MEState, m::MineralExplorationP
     #x, y = get_agent_trajectory(s.agent_bank_angle, m)
     x, y = normalize_agent_coordinates(s.agent_pos_x, s.agent_pos_y, m.smooth_grid_element_length)
     title = t == nothing ? "geophysical map with plane trajectory" : "geophysical map with plane trajectory t=$t"
-    p = plot_map(s.smooth_map, title)
-    add_agent_trajectory_to_plot!(p, x, y)
+    p = plot_map(s.smooth_map, "", colorbar=false, axis=false)
+    add_agent_trajectory_to_plot!(p, x, y, add_start=false)
     return p
 end
 
@@ -620,8 +620,8 @@ function plot_base_map_and_plane_trajectory(s::MEState, m::MineralExplorationPOM
     #x, y = get_agent_trajectory(s.agent_bank_angle, m)
     x, y = normalize_agent_coordinates(s.agent_pos_x, s.agent_pos_y, m.base_grid_element_length)
     title = t == nothing ? "ore map with plane trajectory" : "ore map with plane trajectory t=$t"
-    p = plot_map(s.ore_map, title)
-    add_agent_trajectory_to_plot!(p, x, y)
+    p = plot_map(s.ore_map, title, axis=false, colorbar=false)
+    add_agent_trajectory_to_plot!(p, x, y, add_start=false)
     return p
 end
 

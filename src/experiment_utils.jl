@@ -1,8 +1,10 @@
 using Statistics
 using Glob
 
-write_baseline_result_to_file(m, final_belief, final_state, means, stds; n_fly, reward, seed, r_massive, grid, which_map=:base) = write_result_to_file(m, final_belief, final_state, means, stds; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=true, grid=grid, which_map=which_map)
-write_intelligent_result_to_file(m, final_belief, final_state, means, stds; n_fly, reward, seed, r_massive, which_map=:smooth) = write_result_to_file(m, final_belief, final_state, means, stds; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=false, grid=nothing, which_map=which_map)
+DPI = 300
+
+write_baseline_result_to_file(m, final_belief, final_state, means, stds; n_fly, reward, seed, r_massive, grid, which_map) = write_result_to_file(m, final_belief, final_state, means, stds; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=true, grid=grid, which_map=which_map)
+write_intelligent_result_to_file(m, final_belief, final_state, means, stds; n_fly, reward, seed, r_massive, which_map) = write_result_to_file(m, final_belief, final_state, means, stds; n_fly=n_fly, reward=reward, seed=seed, r_massive=r_massive, baseline=false, grid=nothing, which_map=which_map)
 function write_result_to_file(m, final_belief, final_state, means=nothing, stds=nothing; n_fly, reward, seed, r_massive, baseline, grid, which_map=:base)
     dir = get_results_dir(baseline=baseline)
     b_hist, vols, mn, std = plot_volume(m, final_belief, r_massive; verbose=false)
@@ -11,7 +13,7 @@ function write_result_to_file(m, final_belief, final_state, means=nothing, stds=
     coords = [final_belief.acts[i].coords for i in 1:(length(final_belief.acts) - 2)];
     #vertical_line_x_coords = unique([c[2] for c in coords])
 
-    # plot map
+    # plot base/smooth map and trajectory 
     if which_map == :smooth
         map_to_plot = final_state.smooth_map
         max_val = m.grid_dim[1] * m.upscale_factor
@@ -21,7 +23,7 @@ function write_result_to_file(m, final_belief, final_state, means=nothing, stds=
         #vertical_line_x_coords = [ceil(Int, x / m.upscale_factor) for x in vertical_line_x_coords]
     end
     title = "$(final_belief.acts[end].type) at t=$(n_fly+1) with belief $mn & truth $r_massive"
-    p = plot_map(map_to_plot, title, axis=false)
+    p = plot_map(map_to_plot, title, axis=false, colorbar=false)
 
     # if baseline
     #     for x in vertical_line_x_coords
@@ -33,25 +35,30 @@ function write_result_to_file(m, final_belief, final_state, means=nothing, stds=
     #     end
     # else
     if !baseline
-        x, y = normalize_agent_coordinates(final_state.agent_pos_x, final_state.agent_pos_y, m.base_grid_element_length)
+        norm_length = which_map == :smooth ? m.smooth_grid_element_length : m.base_grid_element_length
+        x, y = normalize_agent_coordinates(final_state.agent_pos_x, final_state.agent_pos_y, norm_length)
         add_agent_trajectory_to_plot!(p, x, y, add_start=false)
-     end
+    end
 
     # save map
     type_for_file = which_map == :smooth ? "smooth" : "base"
-    savefig(p, "$(dir)trial_$(seed)_$(type_for_file)_trajectory.pdf")
-    plot!(p, title="")
-    savefig(p, "$(dir)trial_$(seed)_$(type_for_file)_trajectory_no_title.pdf")
+    savefig(p, "$(dir)trial_$(seed)_$(type_for_file)_trajectory.png")
+    plot!(p, title="", dpi=DPI)
+    savefig(p, "$(dir)trial_$(seed)_$(type_for_file)_trajectory_no_title.png")
     empty!(p)
+
+    p = plot_map(final_state.ore_map, "", axis=false, colorbar=false)
+    plot!(p, dpi=DPI)
+    savefig(p, "$(dir)trial_$(seed)_ore_map.png")
 
     # plot and save belief
     p_mean, p_std = plot(final_belief, return_individual=true)
     # remove title
-    plot!(p_mean, title="")
-    plot!(p_std, title="")
+    plot!(p_mean, title="", dpi=DPI)
+    plot!(p_std, title="",dpi=DPI)
 
-    savefig(p_mean, "$(dir)trial_$(seed)_beliefmn.pdf")
-    savefig(p_std, "$(dir)trial_$(seed)_beliefstd.pdf")
+    savefig(p_mean, "$(dir)trial_$(seed)_beliefmn.png")
+    savefig(p_std, "$(dir)trial_$(seed)_beliefstd.png")
     empty!(p_mean)
     empty!(p_std)
 
@@ -96,7 +103,7 @@ function get_results_dir(;baseline::Bool)
     if baseline
         dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/baseline/"
     else
-        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/intelligent_cf8/"
+        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/intelligent/"
     end
     return dir
 end
