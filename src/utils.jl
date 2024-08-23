@@ -435,11 +435,11 @@ function plot_map(map, title; allow_space=false, axis=nothing, colorbar=true)
     return heatmap(map[:, :, 1], title=title, fill=true, clims=(0.0, 1.0), aspect_ratio=1, primary=false, xlims=xl, axis=axis, ylims=yl, c=:viridis, legend=:none)
 end
 
-function plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false, axis=true)
+function plot_mass_map(mainbody_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false, axis=true)
     #@info "plot_mass_map(ore_map, massive_threshold, cmap=:viridis; dim_scale=1, truth=false)"
     xl = (0.5, size(ore_map, 1) + 0.5)
     yl = (0.5, size(ore_map, 2) + 0.5)
-    s_massive = ore_map .>= massive_threshold
+    s_massive = mainbody_map .>= massive_threshold
     r_massive = dim_scale * sum(s_massive)
     mass_fig = heatmap(s_massive[:, :, 1], title="massive ore deposits: $(round(r_massive, digits=2))", fill=true, axis=axis, clims=(0.0, 1.0), aspect_ratio=1, xlims=xl, ylims=yl, c=cmap)
     return (mass_fig, r_massive)
