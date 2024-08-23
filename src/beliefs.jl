@@ -494,17 +494,17 @@ Base.rand(b::MEBelief) = rand(Random.GLOBAL_RNG, b)
 
 function summarize(b::MEBelief)
     #@info "summarize(b::MEBelief)"
-    (x, y, z) = size(b.particles[1].ore_map)
+    (x, y, z) = size(b.particles[1].mainbody_map)
     μ = zeros(Float64, x, y, z)
     w = 1.0 / length(b.particles)
-    for p in b.particles
-        ore_map = p.ore_map
-        μ .+= ore_map .* w
+    for p in b.mainbody_map
+        mainbody_map = p.mainbody_map
+        μ .+= mainbody_map .* w
     end
     σ² = zeros(Float64, x, y, z)
     for p in b.particles
-        ore_map = p.ore_map
-        σ² .+= w * (ore_map - μ) .^ 2
+        mainbody_map = p.mainbody_map
+        σ² .+= w * (mainbody_map - μ) .^ 2
     end
     return (μ, σ²)
 end

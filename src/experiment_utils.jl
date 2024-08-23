@@ -101,9 +101,9 @@ end
 
 function get_results_dir(;baseline::Bool)
     if baseline
-        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/baseline/"
+        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/baselinechg/"
     else
-        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/intelligent/"
+        dir = "/Users/benbarlow/dev/MineralExploration/data/experiments/intelligentchg/"
     end
     return dir
 end
@@ -354,3 +354,4 @@ function plot_std(;baseline::Bool, dir=nothing)
     # Plot the results
     plot(1:length(average_std_by_line), average_std_by_line, xlabel="Line Number", ylabel="Average Std Dev", title="Average Std Dev by Line Number", legend=false)
 end
+
