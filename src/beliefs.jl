@@ -497,7 +497,7 @@ function summarize(b::MEBelief)
     (x, y, z) = size(b.particles[1].mainbody_map)
     μ = zeros(Float64, x, y, z)
     w = 1.0 / length(b.particles)
-    for p in b.mainbody_map
+    for p in b.particles
         mainbody_map = p.mainbody_map
         μ .+= mainbody_map .* w
     end
