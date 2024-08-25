@@ -26,7 +26,7 @@ m = MineralExplorationPOMDP(
     sigma=3,
     geophysical_noise_std_dev=0.02,
     extraction_lcb = 0.7,
-    extraction_ucb = 0.7
+    extraction_ucb = 0.7,
     )
 
 # set up the solver

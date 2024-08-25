@@ -181,16 +181,16 @@ function normalize_and_weight(lode_map::AbstractArray, mainbody_weight::Real)
     return lode_map
 end
 
-calc_massive(pomdp::MineralExplorationPOMDP, s::MEState) = calc_massive(s.ore_map, pomdp.massive_threshold, pomdp.dim_scale)
-function calc_massive(ore_map::AbstractArray, massive_threshold::Real, dim_scale::Real)
-    return dim_scale*sum(ore_map .>= massive_threshold)
+calc_massive(pomdp::MineralExplorationPOMDP, s::MEState) = calc_massive(s.mainbody_map, pomdp.massive_threshold, pomdp.dim_scale)
+function calc_massive(map::AbstractArray, massive_threshold::Real, dim_scale::Real)
+    return dim_scale*sum(map .>= massive_threshold)
 end
 
 function extraction_reward(m::MineralExplorationPOMDP, s::MEState)
     #@info "extraction_reward(m::MineralExplorationPOMDP, s::MEState)"
     truth = size(s.mainbody_map) == m.high_fidelity_dim
     dim_scale = truth ? m.target_dim_scale : m.dim_scale
-    r_massive = calc_massive(s.ore_map, m.massive_threshold, dim_scale)
+    r_massive = calc_massive(s.mainbody_map, m.massive_threshold, dim_scale)
     r = m.strike_reward*r_massive
     r -= m.extraction_cost
     return r

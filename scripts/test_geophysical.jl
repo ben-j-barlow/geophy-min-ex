@@ -31,7 +31,6 @@ m = MineralExplorationPOMDP(
     init_heading=(HEAD_NORTH + HEAD_EAST) / 2,
     max_bank_angle=55,
     max_timesteps=250,
-    massive_threshold=0.7,
     out_of_bounds_cost=0, # greater than -10 so 0.1*extraction_reward() is a smaller negative
     out_of_bounds_tolerance=0.0,
     fly_cost=0.01,

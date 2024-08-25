@@ -171,7 +171,7 @@ abstract type MainbodyGen end
     fly_cost::Float64 = 0.01
     out_of_bounds_cost::Float64 = 5.0  # reward gets penalized if the plane position is out of bounds at a timestep, does not penalize if the plane is out of bounds between timesteps
     out_of_bounds_tolerance::Int = -1 # number of grid base map grid squares the agent can be out of bounds before incurring cost
-    massive_threshold::Float64 = 0.7
+    massive_threshold::Float64 = 0.45
     strike_reward::Float64 = 1.0
     init_bank_angle::Int = 0
     init_pos_x::Float64 = 600.0
@@ -183,7 +183,7 @@ abstract type MainbodyGen end
     timestep_in_seconds::Int = 1
     observations_per_timestep::Int = 1
     velocity::Int = 50
-    extraction_cost::Float64 = 150.0
+    extraction_cost::Float64 = 155.0
     extraction_lcb::Float64 = 0.7
     extraction_ucb::Float64 = 0.7
     target_mass_params::Tuple{Real, Real} = (extraction_cost, extraction_cost/3) # target mean and std when standardizing ore mass distributions
