@@ -1,5 +1,5 @@
 using MineralExploration
 
-plot_std(baseline=true)
+length(get_uncompleted_seeds(baseline=false))
 
 output_results(baseline=false)

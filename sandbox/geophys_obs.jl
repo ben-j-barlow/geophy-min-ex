@@ -49,6 +49,7 @@ end
 
 
 function aggregate_base_map_duplicates(obs::GeophysicalObservations)
+    @info "aggregate_base_map_duplicates()"
     # Create a dictionary to store the sums and counts of readings for each coordinate
     coord_sum = Dict{Tuple{Int64, Int64}, Float64}()
     coord_count = Dict{Tuple{Int64, Int64}, Int64}()

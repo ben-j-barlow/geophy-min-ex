@@ -103,6 +103,8 @@ savefig(b_mn, path)
 path = string(save_dir, "$(t)bstd.png")
 savefig(b_std, path)
 
+final_belief = nothing
+
 for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", rng=m.rng)        
     if a.type == :fly
         n_fly += 1
@@ -146,13 +148,10 @@ for (sp, a, r, bp, t) in stepthrough(m, policy, up, b0, s0, "sp,a,r,bp,t", rng=m
                 add_agent_trajectory_to_plot!(map_and_plane, [norm_x, norm_x], [0, max_val], add_start=false) 
             end
             if final_belief.decided
-                coords = [final_belief.acts[i].coords for i in 1:(length(final_belief.acts) - 2)];
-                vertical_line_x_coords = unique([c[2] for c in coords])
-                for x in vertical_line_x_coords
-                    add_agent_trajectory_to_plot!(map_and_plane, [x, x], [0, max_val], add_start=false)
-                    if grid
-                        add_agent_trajectory_to_plot!(map_and_plane, [0, max_val], [x, x], add_start=false)
-                    end
+                for x in [8,16,24,32,40]
+                    x_to_plot = convert(Int64, x * m.upscale_factor)
+                    add_agent_trajectory_to_plot!(map_and_plane, [x_to_plot, x_to_plot], [0, 192], add_start=false)
+                    add_agent_trajectory_to_plot!(map_and_plane, [0, 192], [x_to_plot, x_to_plot], add_start=false)
                 end
             end
 
