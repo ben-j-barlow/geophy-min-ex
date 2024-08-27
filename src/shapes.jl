@@ -59,7 +59,7 @@ end
 """
 Distribution for determining the center of the mainbody.
 """
-function center_distribution(grid_dims; bounds=[grid_dims[1]/4, grid_dims[1]/2])
+function center_distribution(grid_dims; bounds=[grid_dims[1]/4, 3*grid_dims[1]/4])
     xdistr = Distributions.Uniform(bounds[1], bounds[2])
     ydistr = Distributions.Uniform(bounds[1], bounds[2])
     return Product([xdistr, ydistr])

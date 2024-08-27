@@ -3,6 +3,7 @@
 end
 
 function sample_ucb_drill(mean, var, idxs)
+    #@info "sample_ucb_drill(mean, var, idxs)"
     scores = belief_scores(mean, var)
     weights = Float64[]
     for idx in idxs
@@ -13,6 +14,7 @@ function sample_ucb_drill(mean, var, idxs)
 end
 
 function belief_scores(m, v)
+    #@info "belief_scores(m, v)"
     norm_mean = m[:,:,1]./(maximum(m[:,:,1]) - minimum(m[:,:,1]))
     norm_mean .-= minimum(norm_mean)
     s = v[:,:,1]
@@ -29,6 +31,7 @@ using Infiltrator
 
 function POMCPOW.next_action(o::NextActionSampler, pomdp::MineralExplorationPOMDP,
                             b::MEBelief, h)
+    #@info "POMCPOW.next_action(o::NextActionSampler, pomdp::MineralExplorationPOMDP, b::MEBelief, h)"
     if h isa Vector
         tried_idxs = h
     elseif h.tree isa POMCPOWTree
@@ -67,6 +70,7 @@ end
 
 function POMCPOW.next_action(obj::NextActionSampler, pomdp::MineralExplorationPOMDP,
                             b::POMCPOW.StateBelief, h)
+    ##@info "POMCPOW.next_action(obj::NextActionSampler, pomdp::MineralExplorationPOMDP, b::POMCPOW.StateBelief, h)"
     o = b.sr_belief.o
     # s = rand(pomdp.rng, b.sr_belief.dist)[1]
     tried_idxs = h.tree.tried[h.node]
@@ -105,6 +109,8 @@ end
 POMCPOW.updater(p::ExpertPolicy) = MEBeliefUpdater(p.m, 1)
 
 function POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.BeliefNode)
+    error("This function hasn't been implemented for geophysical version, returns 0 for bank angle")
+    #@info "POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.BeliefNode)"
     srb = node.tree.sr_beliefs[node.node]
     cv = srb.dist
     particles = MEState[]
@@ -125,14 +131,15 @@ function POMCPOW.BasicPOMCP.extract_belief(p::MEBeliefUpdater, node::POMCPOW.Bel
     for i = 1:size(state.bore_coords)[2]
         a = MEAction(coords=CartesianIndex((state.bore_coords[1, i], state.bore_coords[2, i])))
         ore_qual = state.ore_map[state.bore_coords[1, i], state.bore_coords[2, i], 1]
-        o = MEObservation(ore_qual, state.stopped, state.decided)
+        o = MEObservation(ore_qual, state.stopped, state.decided, nothing)
         push!(acts, a)
         push!(obs, o)
     end
-    return MEBelief(coords, stopped, particles, acts, obs, p)
+    return MEBelief(coords, stopped, particles, acts, obs, p, 0)
 end
 
 function POMDPs.action(p::ExpertPolicy, b::MEBelief)
+    #@info "POMDPs.action(p::ExpertPolicy, b::MEBelief)"
     volumes = Float64[]
     for s in b.particles
         v = calc_massive(p.m, s)
@@ -172,6 +179,7 @@ RandomSolver(;rng=Random.GLOBAL_RNG) = RandomSolver(rng)
 POMDPs.solve(solver::RandomSolver, problem::Union{POMDP,MDP}) = POMCPOW.RandomPolicy(solver.rng, problem, BeliefUpdaters.PreviousObservationUpdater())
 
 function leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.BeliefNode, ::Any)
+    #@info "leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.BeliefNode, ::Any)"
     if s.stopped
         γ = POMDPs.discount(pomdp)
     else
@@ -196,6 +204,41 @@ function leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.
     end
 end
 
+function geophysical_leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.BeliefNode, ::Any)
+    #@info "leaf_estimation(pomdp::MineralExplorationPOMDP, s::MEState, h::POMCPOW.BeliefNode, ::Any)"
+    # prepare discount
+    if s.stopped
+        γ = POMDPs.discount(pomdp)
+    else
+        if is_empty(s.geophysical_obs)
+            n_readings = 0
+        else
+            if pomdp.observations_per_timestep != 1
+                error("assumed one observation per timestep")
+            end
+            n_readings = length(s.geophysical_obs.reading)
+        end
+        t = pomdp.max_timesteps - s.timestep + 1
+        γ = POMDPs.discount(pomdp)^t
+    end
+
+    # prepare return value
+    if s.decided
+        return 0.0
+    else
+        r_extract = extraction_reward(pomdp, s)
+        if r_extract >= 0.0
+            if check_plane_within_region(pomdp, last(s.agent_pos_x), last(s.agent_pos_y), 0)
+                return r_extract*0.9
+            else
+                return 0 # penalty for going out of region
+            end
+        else
+            return r_extract*0.1
+        end
+    end
+end
+
 struct GridPolicy <: Policy
     m::MineralExplorationPOMDP
     n::Int64 # Number of grid points per dimension (n x n)
@@ -204,6 +247,7 @@ struct GridPolicy <: Policy
 end
 
 function GridPolicy(m::MineralExplorationPOMDP, n::Int, grid_size::Int)
+    #@info "GridPolicy(m::MineralExplorationPOMDP, n::Int, grid_size::Int)"
     grid_start_i = (m.grid_dim[1] - grid_size)/2
     grid_start_j = (m.grid_dim[2] - grid_size)/2
     grid_end_i = grid_start_i + grid_size
@@ -222,6 +266,7 @@ function GridPolicy(m::MineralExplorationPOMDP, n::Int, grid_size::Int)
 end
 
 function POMDPs.action(p::GridPolicy, b::MEBelief)
+    #@info "POMDPs.action(p::GridPolicy, b::MEBelief)"
     n_bores = length(b.rock_obs)
     if b.stopped
         volumes = Float64[]
@@ -244,4 +289,99 @@ function POMDPs.action(p::GridPolicy, b::MEBelief)
         coords = p.grid_coords[n_bores + 1]
         return MEAction(coords=coords)
     end
+end
+
+
+mutable struct BaselineGeophysicalPolicy <: Policy
+    m::MineralExplorationPOMDP
+    max_coord::Int64
+    smooth_move_size::Int64
+    smooth_sidestep_size::Int64
+    init_coords::CartesianIndex{2}
+    early_stop::Bool
+    moves::Vector{MEAction}  # Field to store all the moves
+    current_move::Int64  # Field to track the current move
+    grid::Bool
+
+    # Inner constructor
+    function BaselineGeophysicalPolicy(m::MineralExplorationPOMDP, max_coord::Int64, smooth_move_size::Int64, smooth_sidestep_size::Int64, init_coords::CartesianIndex{2}, early_stop::Bool, grid::Bool)
+        instance = new(m, max_coord, smooth_move_size, smooth_sidestep_size, init_coords, early_stop, Vector{MEAction}(), 1, grid)
+        instance.moves = get_all_moves(instance)
+        return instance
+    end
+end
+
+function POMDPs.action(p::BaselineGeophysicalPolicy, b::MEBelief)
+    #@info "POMDPs.action(p::GridPolicy, b::MEBelief)"
+    if b.stopped
+        vols = [calc_massive(p.m, s) for s in b.particles]
+        mean_vols = round(mean(vols), digits=2)
+        if mean_vols >= p.m.extraction_cost
+            return MEAction(type=:mine)
+        else
+            return MEAction(type=:abandon)
+        end
+    end
+
+    if p.early_stop && calculate_stop_bound(p.m, b) && p.current_move > 15
+        return MEAction(type=:stop)
+    end
+
+    # Return the next action from the moves list
+    action = deepcopy(p.moves[p.current_move])
+    p.current_move += 1  # Increment the counter
+    return action
+end
+
+function get_next_baseline_coord(p::BaselineGeophysicalPolicy, b::MEBelief)
+    if length(b.acts) == 0  
+        # first move: return init coordinates
+        return p.init_coords
+    end
+    init_x = p.init_coords[2]
+    return calculate_move(init_x, p.max_coord, p.smooth_move_size, p.smooth_sidestep_size, length(b.acts))
+end
+
+function get_all_moves(p::BaselineGeophysicalPolicy)
+    init_x = p.init_coords[2]
+    
+    vertical_moves = [p.init_coords]
+    num_actions = 1
+    new_x = 1
+    
+    while new_x < p.max_coord
+        # Determine the number of steps in each column
+        moves_in_column = floor(Int, p.max_coord / p.smooth_move_size)
+
+        # Determine how many complete columns we've finished
+        completed_columns = div(num_actions, moves_in_column)
+
+        # Determine the position within the current column
+        steps_in_current_column = mod(num_actions, moves_in_column)
+
+        # Determine the direction of travel: north for odd columns, south for even columns
+        head_north = mod(completed_columns, 2) == 0
+        
+        # Calculate the new x position after sidesteps
+        new_x = init_x + completed_columns * p.smooth_sidestep_size
+        
+        # Calculate new _y
+        new_y = head_north ? (1 + steps_in_current_column * p.smooth_move_size) : (p.max_coord - steps_in_current_column * p.smooth_move_size)
+        push!(vertical_moves, CartesianIndex(new_y, new_x))
+
+        num_actions += 1
+    end
+    
+    horizontal_moves = [CartesianIndex(m[2], m[1]) for m in vertical_moves]
+
+    vertical_lines = MEAction[MEAction(type=:fake_fly, coords=coord) for coord in vertical_moves]
+
+    if p.grid
+        horizontal_lines = MEAction[MEAction(type=:fake_fly, coords=coord) for coord in horizontal_moves]
+        all_lines = vcat(vertical_lines, horizontal_lines)
+    else
+        all_lines = vertical_lines
+    end
+    # concat the two lists and add a stop action
+    return vcat(all_lines, MEAction(type=:stop))
 end

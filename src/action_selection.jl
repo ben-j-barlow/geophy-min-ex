@@ -10,16 +10,18 @@ end
 # end
 
 function kernel(x::MEAction, y::MEAction, l::Float64, sf::Float64)
+    @info "kernel(x::MEAction, y::MEAction, l::Float64, sf::Float64)"
     if x.type == y.type
         d = (x.coords[1] - y.coords[1])^2 + (x.coords[2] - y.coords[2])^2
-        return sf*exp(-d/l^2)
+        return sf * exp(-d / l^2)
     else
         return Inf
     end
 end
 
 function gp_posterior(X::Vector{MEAction}, x::Vector{MEAction},
-                    y::Vector{Float64}, ns, l, sf, sn)
+    y::Vector{Float64}, ns, l, sf, sn)
+    @info "gp_posterior(X::Vector{MEAction}, x::Vector{MEAction}, y::Vector{Float64}, ns, l, sf, sn)"
     m = length(X)
     n = length(x)
     Kxx = zeros(Float64, n, n)
@@ -29,7 +31,7 @@ function gp_posterior(X::Vector{MEAction}, x::Vector{MEAction},
         for j = 1:n
             Kxx[i, j] = kernel(x[i], x[j], l, sf)
             if i == j
-                Kxx[i, j] += sn/ns[i]
+                Kxx[i, j] += sn / ns[i]
             end
         end
         for j = 1:m
@@ -38,42 +40,45 @@ function gp_posterior(X::Vector{MEAction}, x::Vector{MEAction},
         end
     end
     α = inv(Kxx)
-    σ² = Kzz - diag(transpose(Kxz)*α*Kxz, 0)
-    μ = transpose(Kxz)*α*y
+    σ² = Kzz - diag(transpose(Kxz) * α * Kxz, 0)
+    μ = transpose(Kxz) * α * y
     return (μ, σ²)
 end
 
 function approx_posterior(X::Vector{MEAction}, x::Vector{MEAction},
-                        y::Vector{Float64}, ns, l, sf, sn)
+    y::Vector{Float64}, ns, l, sf, sn)
+    @info "approx_posterior(X::Vector{MEAction}, x::Vector{MEAction}, y::Vector{Float64}, ns, l, sf, sn)"
     m = length(X)
     n = length(x)
     W = zeros(Float64, m, n)
     for i = 1:m
         for j = 1:n
-            W[i, j] = kernel(X[i], x[j], l, sf)/sf*ns[j]
+            W[i, j] = kernel(X[i], x[j], l, sf) / sf * ns[j]
         end
     end
 
     w = sum(W, dims=2)
-    σ² = sf./(1.0 .+ w)
-    μ = W*y./w
+    σ² = sf ./ (1.0 .+ w)
+    μ = W * y ./ w
     return (μ, σ²)
 end
 
 function expected_improvement(μ, σ², f)
+    @info "expected_improvement(μ, σ², f)"
     σ = sqrt.(σ²)
     dist = Normal(0.0, 1.0)
     Δ = μ .- f
-    δ = Δ./σ
-    ei = Δ.*(Δ .>= 0.0)
+    δ = Δ ./ σ
+    ei = Δ .* (Δ .>= 0.0)
     for (i, d) in enumerate(δ)
-        ei[i] += σ[i]*pdf(dist, d) - abs(Δ[i])*cdf(dist, d)
+        ei[i] += σ[i] * pdf(dist, d) - abs(Δ[i]) * cdf(dist, d)
     end
     return ei
 end
 
 function POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP,
-                            b::MEBelief, h)
+    b::MEBelief, h)
+    @info "POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP, b::MEBelief, h)"
     a_idxs = h.tree.tried[h.node]
     tried_actions = h.tree.a_labels[a_idxs]::Vector{MEAction}
     action_values = h.tree.q[a_idxs]
@@ -90,14 +95,15 @@ function POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP,
     elseif o.init_a != nothing
         a = POMCPOW.next_action(o.init_a, pomdp, b, h)
     else
-        a = rand(pomdp.rng,actions)
+        a = rand(pomdp.rng, actions)
         #a = rand(actions)
     end
     return a
 end
 
 function POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP,
-                            b::POMCPOW.StateBelief, h)
+    b::POMCPOW.StateBelief, h)
+    @info "POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP, b::POMCPOW.StateBelief, h)"
     a_idxs = h.tree.tried[h.node]
     tried_actions = h.tree.a_labels[a_idxs]::Vector{MEAction}
     action_values = h.tree.q[a_idxs]
@@ -114,7 +120,7 @@ function POMCPOW.next_action(o::GPNextAction, pomdp::MineralExplorationPOMDP,
     elseif o.init_a != nothing
         a = POMCPOW.next_action(o.init_a, pomdp, b, h)
     else
-        a = rand(pomdp.rng,actions)
+        a = rand(pomdp.rng, actions)
         #a = rand(actions)
     end
     return a

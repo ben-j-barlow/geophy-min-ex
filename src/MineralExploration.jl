@@ -3,10 +3,12 @@ module MineralExploration
 using BeliefUpdaters
 using CSV
 using DataFrames
+using Dates
 using DelimitedFiles
 using Distributions
 using Distances # for KL and JS
 using GeoStats
+using Glob
 using ImageFiltering
 using Infiltrator # for debugging
 using Interpolations
@@ -15,6 +17,7 @@ using JSON
 using KernelDensity
 using Luxor
 using LinearAlgebra
+using Logging
 using MCTS
 using Parameters
 using Plots; default(fontfamily="Computer Modern", framestyle=:box) # LaTex-style
@@ -38,7 +41,15 @@ export
         MineralExplorationPOMDP,
         MEInitStateDist,
         MEBelief,
-        MainbodyGen
+        HEAD_NORTH,
+        HEAD_SOUTH,
+        HEAD_EAST,
+        HEAD_WEST,
+        MainbodyGen,
+        GeophysicalObservations,
+        aggregate_base_map_duplicates,
+        aggregate_smooth_map_duplicates,
+        get_geophysical_solver
 include("common.jl")
 
 export
@@ -62,13 +73,19 @@ export
         particles,
         support,
         get_input_representation,
-        plot_input_representation
+        plot_input_representation,
+        calculate_stop_bound
 include("beliefs.jl")
 
 export
         initialize_data!,
         high_fidelity_obs,
-        calc_massive
+        calc_massive,
+        update_agent_state,
+        generate_geophysical_obs_sequence,
+        is_empty,
+        check_plane_within_region,
+        distance_from_map
 include("pomdp.jl")
 
 export
@@ -84,7 +101,9 @@ export
         ExpertPolicy,
         RandomSolver,
         GridPolicy,
-        leaf_estimation
+        leaf_estimation,
+        geophysical_leaf_estimation,
+        BaselineGeophysicalPolicy
 include("solver.jl")
 
 export
@@ -102,10 +121,40 @@ include("standardization.jl")
 export
         plot_history,
         run_trial,
+        run_geophysical_trial,
         gen_cases,
         plot_ore_map,
+        plot_map,
         plot_mass_map,
-        plot_volume
+        plot_volume,
+        nan_unvisited_cells,
+        set_readings_in_map,
+        normalize_agent_coordinates,
+        add_agent_trajectory_to_plot!,
+        get_agent_trajectory,
+        plot_smooth_map_and_plane_trajectory,
+        plot_base_map_and_plane_trajectory,
+        get_base_map_coordinates,
+        get_smooth_map_coordinates,
+        plot_base_map_at_observation_locations,
+        plot_smooth_map_at_observation_locations,
+        normalize_agent_coordinates
 include("utils.jl")
+
+export 
+        generate_log_file_name,
+        prepare_logger,
+        close_logger
+include("logging.jl")
+
+export 
+        write_baseline_result_to_file,
+        write_intelligent_result_to_file,
+        get_uncompleted_seeds,
+        get_all_seeds,
+        output_results,
+        compare_results,
+        plot_std
+include("experiment_utils.jl")
 
 end
